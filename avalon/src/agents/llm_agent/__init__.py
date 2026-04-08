@@ -5,7 +5,8 @@ from .chatgpt_agent import (
     DirectAgent,
     ReActAgent, 
     ReConAgent,
-    LASIAgent
+    LASIAgent,
+    RefinerWrapper
 )
 
 __all__ = [
@@ -13,5 +14,6 @@ __all__ = [
     'DirectAgent',
     'ReActAgent',
     'ReConAgent', 
-    'LASIAgent'
+    'LASIAgent',
+    'RefinerWrapper'
 ]

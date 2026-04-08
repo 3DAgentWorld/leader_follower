@@ -1,16 +1,19 @@
 #!/usr/bin/env python
 # encoding: utf-8
 """
-LLM Agent 实现
-支持四种类型：
-- DirectAgent: 直接生成回复（1次API调用）
-- ReActAgent: ReAct 框架（思考-行动循环）
-- ReConAgent: 关系一致性框架（跨模态/玩家关系分析）
-- LASIAgent: LASI 框架（局势分析-计划-行动-回复，4次API调用）
+LLM Agent implementations for Avalon.
+
+Supported agent types:
+- DirectAgent: Direct response generation (1 API call)
+- ReActAgent: ReAct framework (Reasoning + Acting, 2 API calls)
+- ReConAgent: Relation Consistency framework (cross-player relation analysis, 3 API calls)
+- LASIAgent: LASI framework (Landscape Analysis - Strategy - Implementation, 4 API calls)
+- RefinerWrapper: Wraps any agent type with a trained Refiner model for persuasive utterance refinement
 """
 import json
 import re
 import time
+import logging
 from typing import List, Optional, Callable
 
 import openai
@@ -18,6 +21,8 @@ import openai
 from ..abs_agent import Agent
 from ..utils import write_json
 from ...apis.chatgpt_api import chatgpt
+
+logger = logging.getLogger(__name__)
 
 try:
     OPENAI_MAX_TOKENS_ERROR = openai.error.InvalidRequestError
@@ -27,44 +32,44 @@ except AttributeError:
 
 def extract_response(output: str) -> str:
     """
-    从 LLM 输出中提取响应内容
-    支持多种格式：
-    1. <response>...</response> (完整闭合标签)
-    2. <response>... (未闭合标签，输出被截断的情况)
+    Extract response content from LLM output.
+    Supports multiple formats:
+    1. <response>...</response> (complete closing tag)
+    2. <response>... (unclosed tag, truncated output)
     3. my response is <...>
-    4. 直接返回原文（如果没有匹配）
+    4. Return raw text if no match found
     """
-    # 首先尝试完整的 <response>...</response> 标签
+    # Try complete <response>...</response> tag first
     match = re.search(r"(?<=<response>).*?(?=</response>)", output, re.S)
     if match:
         return match.group().strip()
     
-    # 如果没有闭合标签，尝试提取 <response> 之后的所有内容（处理输出被截断的情况）
+    # If no closing tag, extract all content after <response> (handles truncated output)
     match = re.search(r"<response>(.+)", output, re.S)
     if match:
         return match.group(1).strip()
     
-    # 尝试 my response is <...> 格式
+    # Try "my response is <...>" format
     match = re.search(r"my response is\s*<(.+?)>", output, re.S | re.I)
     if match:
         return match.group(1).strip()
     
-    # 尝试 my response is ... 格式（不带尖括号）
+    # Try "my response is ..." format (without angle brackets)
     match = re.search(r"my response is\s*[:\-]?\s*(.+)", output, re.S | re.I)
     if match:
         return match.group(1).strip()
     
-    # 如果都没匹配，返回原文
+    # If nothing matched, return raw text
     return output.strip()
 
 
 class BaseAvalonAgent(Agent):
     """
-    Avalon 游戏 Agent 基类
-    提供通用的夜晚信息管理、对话历史管理等功能
+    Base class for Avalon game agents.
+    Provides common functionality: night info management, dialogue history, intent identification, etc.
     """
     
-    # 意图识别提示词模板
+    # Intent identification prompt template
     INTENT_IDENTIFICATION_PROMPT = """You are {name}, playing as {role} in the game of Avalon.
 Your goal: {goal}
 
@@ -96,6 +101,7 @@ Output your response in the following format:
                  api_key: str, output_dir: str, api_base: Optional[str] = None,
                  thinking_callback: Optional[Callable[[str, str], None]] = None,
                  enable_intent_identification: bool = False,
+                 extra_body: Optional[dict] = None,
                  **kwargs):
         super().__init__(**kwargs)
         self.name = name
@@ -109,58 +115,60 @@ Output your response in the following format:
         self.api_key = api_key
         self.api_base = api_base
         self.output_dir = output_dir
+        self.extra_body = extra_body
         
-        # 夜晚阶段获得的信息，会合并到系统提示中
+        # Night phase information, merged into system prompt
         self.night_info = ""
         
-        # 简化的对话历史记录
+        # Simplified dialogue history
         self.conversation_history = []
         
-        # 当前游戏阶段
+        # Current game phase
         self.phase = 0
         
-        # 思考过程回调函数（用于 watch 模式显示中间过程）
+        # Thinking process callback (for watch mode display)
         self.thinking_callback = thinking_callback
         
-        # 是否启用意图识别（论文中的Intent Identification）
+        # Whether to enable intent identification
         self.enable_intent_identification = enable_intent_identification
         
-        # 存储最近一次的意图识别结果
+        # Store the most recent intent identification result
         self.last_intent = None
 
     def get_system_prompt_with_night_info(self) -> str:
-        """获取包含夜晚信息的系统提示"""
+        """Get system prompt with night phase information appended."""
         if self.night_info:
             return f"{self.system_prompt}\n\n{self.night_info}"
         return self.system_prompt
 
     def get_conversation_context(self) -> str:
-        """获取当前对话历史的简要上下文"""
+        """Get a brief context summary of the current dialogue history."""
         if not self.conversation_history:
             return "None"
         recent = self.conversation_history[-20:]
         return "\n".join([f"{item['name']}: {item['message']}" for item in recent])
 
     def send_messages(self, messages: List[dict]) -> str:
-        """发送消息到 LLM"""
+        """Send messages to the LLM and return the response."""
         output = chatgpt(self.model, messages, self.temperature, 
-                        api_key=self.api_key, api_base=self.api_base)
+                        api_key=self.api_key, api_base=self.api_base,
+                        extra_body=self.extra_body)
         return output
 
     def receive(self, name: str, message: str) -> None:
-        """接收来自其他玩家的消息"""
+        """Receive a message from another player."""
         temp_phase = message.split("|")[0]
         self.phase = temp_phase
         message = message.split("|")[1]
         self.conversation_history.append({"name": name, "message": message})
 
     def emit_thinking(self, stage: str, content: str):
-        """发出思考过程（用于 watch 模式显示）"""
+        """Emit thinking process (for watch mode display)."""
         if self.thinking_callback:
             self.thinking_callback(stage, content)
 
     def reflection(self, player_role_mapping: dict, file_name: str, winners: list, duration: int):
-        """游戏结束后的反思（默认不做任何操作）"""
+        """Post-game reflection (no-op by default)."""
         pass
 
     @staticmethod
@@ -170,17 +178,16 @@ Output your response in the following format:
 
     def identify_intent(self, next_player: str) -> dict:
         """
-        意图识别：识别希望和不希望后置位玩家说的内容
+        Intent Identification: identify desired and undesired responses from the next player.
         
-        基于论文中的 Intent Identification 方法：
-        - 识别 K 个期望的响应（对当前玩家有利）
-        - 识别 K 个不期望的响应（对当前玩家不利）
+        - Identify K desired responses (beneficial to the current player)
+        - Identify K undesired responses (harmful to the current player)
         
         Args:
-            next_player: 下一个发言的玩家名称
+            next_player: Name of the next player to speak.
             
         Returns:
-            dict: 包含 desired_responses 和 undesired_responses 的字典
+            dict: Contains desired_responses and undesired_responses.
         """
         if not self.enable_intent_identification:
             return None
@@ -202,21 +209,21 @@ Output your response in the following format:
         
         output = self.send_messages(messages)
         
-        # 解析期望的响应
+        # Parse desired responses
         desired_responses = []
         desired_match = re.search(r"<desired_responses>(.+?)</desired_responses>", output, re.S)
         if desired_match:
             desired_text = desired_match.group(1)
-            # 提取每行的响应
+            # Extract each line's response
             for line in desired_text.strip().split('\n'):
                 line = line.strip()
                 if line:
-                    # 移除序号前缀（如 "1. ", "2. " 等）
+                    # Remove numbered prefix (e.g., "1. ", "2. ")
                     cleaned = re.sub(r'^\d+\.\s*', '', line)
                     if cleaned:
                         desired_responses.append(cleaned)
         
-        # 解析不期望的响应
+        # Parse undesired responses
         undesired_responses = []
         undesired_match = re.search(r"<undesired_responses>(.+?)</undesired_responses>", output, re.S)
         if undesired_match:
@@ -228,7 +235,7 @@ Output your response in the following format:
                     if cleaned:
                         undesired_responses.append(cleaned)
         
-        # 限制为前3个（K=3）
+        # Limit to first 3 (K=3)
         desired_responses = desired_responses[:3]
         undesired_responses = undesired_responses[:3]
         
@@ -237,12 +244,12 @@ Output your response in the following format:
             "undesired_responses": undesired_responses
         }
         
-        # 保存到日志
+        # Save to log
         self.log(f"{self.output_dir}/intent_identification.txt",
                  f"phase:{self.phase}\nnext_player:{next_player}\ninput:{prompt}\noutput:\n{output}\n" +
                  f"parsed_intent:{json.dumps(intent_result, ensure_ascii=False)}\n--------------------\n")
         
-        # 显示思考过程
+        # Display thinking process
         self.emit_thinking("Intent Identification", 
                           f"Desired: {desired_responses}\nUndesired: {undesired_responses}")
         
@@ -250,14 +257,14 @@ Output your response in the following format:
         return intent_result
     
     def get_last_intent(self) -> dict:
-        """获取最近一次的意图识别结果"""
+        """Get the most recent intent identification result."""
         return self.last_intent
 
 
 class DirectAgent(BaseAvalonAgent):
     """
-    DirectAgent: 直接生成回复
-    最简单的实现，仅 1 次 API 调用
+    DirectAgent: Direct response generation.
+    Simplest implementation with only 1 API call.
     """
 
     def __init__(self, response_prompt: str, **kwargs):
@@ -271,7 +278,7 @@ class DirectAgent(BaseAvalonAgent):
 
         context = self.get_conversation_context()
         
-        # 直接生成回复
+        # Generate response directly
         prompt = self.response_prompt.format(
             name=self.name, phase=self.phase, role=self.role, 
             introduction=self.introduction, strategy=self.strategy,
@@ -290,7 +297,7 @@ class DirectAgent(BaseAvalonAgent):
         self.log(f"{self.output_dir}/response.txt",
                  f"phase:{self.phase}\ninput:{prompt}\noutput:\n{output}\n--------------------")
         
-        # 记录对话历史
+        # Record dialogue history
         self.conversation_history.append({"name": "Host", "message": message})
         self.conversation_history.append({"name": self.name, "message": response})
         
@@ -299,15 +306,15 @@ class DirectAgent(BaseAvalonAgent):
 
 class ReActAgent(BaseAvalonAgent):
     """
-    ReActAgent: ReAct 框架（Reasoning + Acting）
-    思考-行动循环，2 次 API 调用
+    ReActAgent: ReAct framework (Reasoning + Acting).
+    Think-act loop with 2 API calls.
     """
 
     def __init__(self, response_prompt: str, 
                  react_prompt: str = None, **kwargs):
         super().__init__(**kwargs)
         self.response_prompt = response_prompt
-        # ReAct 思考提示
+        # ReAct thinking prompt
         self.react_prompt = react_prompt or """You are {name}, playing as {role} in Avalon.
 Current phase: {phase}
 Your goal: {goal}
@@ -337,7 +344,7 @@ Observation: [expected outcome]
 
         context = self.get_conversation_context()
         
-        # Step 1: ReAct 思考
+        # Step 1: ReAct thinking
         t_think_start = time.time()
         react_prompt = self.react_prompt.format(
             name=self.name, phase=self.phase, role=self.role,
@@ -353,7 +360,7 @@ Observation: [expected outcome]
         thinking = self.send_messages(messages)
         t_think = time.time() - t_think_start
         
-        # 提取思考内容并显示
+        # Extract thinking content and display
         think_match = re.search("(?<=<thinking>).*?(?=</thinking>)", thinking, re.S)
         think_content = think_match.group().strip() if think_match else thinking
         self.emit_thinking("ReAct Thinking", think_content)
@@ -361,7 +368,7 @@ Observation: [expected outcome]
         self.log(f"{self.output_dir}/react_thinking.txt",
                  f"phase:{self.phase}\ninput:{react_prompt}\noutput:\n{thinking}\n--------------------")
 
-        # Step 2: 生成回复
+        # Step 2: Generate response
         t_response_start = time.time()
         prompt = self.response_prompt.format(
             name=self.name, phase=self.phase, role=self.role,
@@ -384,7 +391,7 @@ Observation: [expected outcome]
         self.log(f"{self.output_dir}/time_cost.txt",
                  f"Think: {t_think}\nResponse: {t_response}\n")
         
-        # 记录对话历史
+        # Record dialogue history
         self.conversation_history.append({"name": "Host", "message": message})
         self.conversation_history.append({"name": self.name, "message": response})
         
@@ -393,13 +400,13 @@ Observation: [expected outcome]
 
 class ReConAgent(BaseAvalonAgent):
     """
-    ReConAgent: 关系一致性框架（Relation Consistency）
-    基于跨玩家关系分析，3 次 API 调用
+    ReConAgent: Relation Consistency framework.
+    Cross-player relation analysis with 3 API calls.
     
-    核心思想：
-    1. 分析玩家间的关系一致性（谁支持谁、谁怀疑谁）
-    2. 通过关系网络识别可能的阵营
-    3. 基于关系分析做出决策
+    Core idea:
+    1. Analyze inter-player relationship consistency (who supports/suspects whom)
+    2. Identify likely factions through relationship networks
+    3. Make decisions based on relation analysis
     """
 
     def __init__(self, response_prompt: str,
@@ -408,7 +415,7 @@ class ReConAgent(BaseAvalonAgent):
         super().__init__(**kwargs)
         self.response_prompt = response_prompt
         
-        # 关系分析提示
+        # Relation analysis prompt
         self.relation_prompt = relation_prompt or """You are {name}, playing as {role} in Avalon.
 Current phase: {phase}
 
@@ -426,7 +433,7 @@ Output in format:
 ...
 </relations>"""
 
-        # 一致性分析提示
+        # Consistency analysis prompt
         self.consistency_prompt = consistency_prompt or """Based on the relationship analysis:
 {relations}
 
@@ -451,7 +458,7 @@ Recommended action: [what to do]
 
         context = self.get_conversation_context()
         
-        # Step 1: 关系分析
+        # Step 1: Relation analysis
         t_relation_start = time.time()
         relation_prompt = self.relation_prompt.format(
             name=self.name, phase=self.phase, role=self.role,
@@ -466,7 +473,7 @@ Recommended action: [what to do]
         relations = self.send_messages(messages)
         t_relation = time.time() - t_relation_start
         
-        # 提取关系并显示
+        # Extract relations and display
         rel_match = re.search("(?<=<relations>).*?(?=</relations>)", relations, re.S)
         rel_content = rel_match.group().strip() if rel_match else relations
         self.emit_thinking("Relation Analysis", rel_content)
@@ -474,7 +481,7 @@ Recommended action: [what to do]
         self.log(f"{self.output_dir}/relation_analysis.txt",
                  f"phase:{self.phase}\noutput:\n{relations}\n--------------------")
 
-        # Step 2: 一致性分析
+        # Step 2: Consistency analysis
         t_consist_start = time.time()
         consist_prompt = self.consistency_prompt.format(
             relations=rel_content, role=self.role, goal=self.game_goal
@@ -488,7 +495,7 @@ Recommended action: [what to do]
         analysis = self.send_messages(messages)
         t_consist = time.time() - t_consist_start
         
-        # 提取分析并显示
+        # Extract analysis and display
         analysis_match = re.search("(?<=<analysis>).*?(?=</analysis>)", analysis, re.S)
         analysis_content = analysis_match.group().strip() if analysis_match else analysis
         self.emit_thinking("Consistency Analysis", analysis_content)
@@ -496,7 +503,7 @@ Recommended action: [what to do]
         self.log(f"{self.output_dir}/consistency_analysis.txt",
                  f"phase:{self.phase}\noutput:\n{analysis}\n--------------------")
 
-        # Step 3: 生成回复
+        # Step 3: Generate response
         t_response_start = time.time()
         prompt = self.response_prompt.format(
             name=self.name, phase=self.phase, role=self.role,
@@ -520,7 +527,7 @@ Recommended action: [what to do]
         self.log(f"{self.output_dir}/time_cost.txt",
                  f"Relation: {t_relation}\nConsistency: {t_consist}\nResponse: {t_response}\n")
         
-        # 记录对话历史
+        # Record dialogue history
         self.conversation_history.append({"name": "Host", "message": message})
         self.conversation_history.append({"name": self.name, "message": response})
         
@@ -529,14 +536,14 @@ Recommended action: [what to do]
 
 class LASIAgent(BaseAvalonAgent):
     """
-    LASIAgent: LASI 框架（Landscape Analysis - Strategy - Implementation）
-    原 SAPAR 的完整流程，4 次 API 调用
+    LASIAgent: LASI framework (Landscape Analysis - Strategy - Implementation).
+    Full pipeline with 4 API calls.
     
-    流程：
-    1. Analysis: 局势分析
-    2. Plan: 制定计划
-    3. Action: 选择行动
-    4. Response: 生成回复
+    Pipeline:
+    1. Analysis: Landscape analysis
+    2. Plan: Strategy formulation
+    3. Action: Action selection
+    4. Response: Response generation
     """
 
     def __init__(self, analysis_prompt: str, plan_prompt: str, 
@@ -611,7 +618,7 @@ class LASIAgent(BaseAvalonAgent):
         response = self.make_response(phase, context, format_plan, action, message)
         t_response = time.time() - t_response_start
         
-        # 记录对话历史
+        # Record conversation history
         self.conversation_history.append({"name": "Host", "message": message})
         self.conversation_history.append({"name": self.name, "message": response})
 
@@ -720,7 +727,7 @@ class LASIAgent(BaseAvalonAgent):
         return response
 
     def reflection(self, player_role_mapping: dict, file_name: str, winners: list, duration: int):
-        """游戏结束后的反思"""
+        """Post-game reflection: analyze strategies and update for future games."""
         p_r_mapping = '\n'.join([f"{k}:{v}" for k, v in player_role_mapping.items()])
         context = self.get_conversation_context()
         
@@ -771,3 +778,245 @@ class LASIAgent(BaseAvalonAgent):
             data={"strategy": strategy, "suggestion": suggestion, "other_strategy": role_strategy},
             path=file_name
         )
+
+
+class RefinerWrapper(Agent):
+    """
+    RefinerWrapper: Wraps any existing agent type with a trained Refiner model.
+
+    Implements a two-stage utterance refinement pipeline:
+    1. The wrapped (backend) agent generates a base utterance u_base
+    2. The Refiner model (a LoRA-finetuned open-source LLM) refines u_base
+       into a more persuasive version u_t
+
+    The Refiner can be seamlessly integrated with any agent type
+    (e.g., "refiner+react", "refiner+direct", "refiner+lasi").
+
+    Usage:
+        # In config.json, set agent_type to "refiner+react", "refiner+direct", etc.
+        # And provide refiner_config with model_path and optional lora_path.
+    """
+
+    def __init__(self, wrapped_agent: BaseAvalonAgent,
+                 refiner_model_path: str,
+                 refiner_lora_path: Optional[str] = None,
+                 refiner_temperature: float = 0.7,
+                 refine_prompt_template: Optional[str] = None,
+                 **kwargs):
+        """
+        Initialize the RefinerWrapper.
+
+        Args:
+            wrapped_agent: The backend agent that generates base utterances.
+            refiner_model_path: Path to the base model for the Refiner (e.g., Qwen2.5-7B-Instruct).
+            refiner_lora_path: Path to the LoRA adapter checkpoint (optional).
+            refiner_temperature: Temperature for Refiner generation.
+            refine_prompt_template: Custom refine prompt template (uses built-in default if None).
+        """
+        super().__init__(name=wrapped_agent.name, role=wrapped_agent.role)
+        self.wrapped_agent = wrapped_agent
+        self.refiner_model_path = refiner_model_path
+        self.refiner_lora_path = refiner_lora_path
+        self.refiner_temperature = refiner_temperature
+        self.refine_prompt_template = refine_prompt_template
+
+        # Lazy-load the Refiner model (loaded on first use)
+        self._refiner_model = None
+        self._refiner_tokenizer = None
+
+    def _load_refiner(self):
+        """Lazy-load the Refiner model and tokenizer."""
+        if self._refiner_model is not None:
+            return
+
+        try:
+            from transformers import AutoModelForCausalLM, AutoTokenizer
+            from peft import PeftModel
+            import torch
+        except ImportError as e:
+            raise ImportError(
+                "RefinerWrapper requires 'transformers', 'peft', and 'torch'. "
+                "Install them with: pip install transformers peft torch"
+            ) from e
+
+        logger.info(f"Loading Refiner base model from {self.refiner_model_path}...")
+        self._refiner_tokenizer = AutoTokenizer.from_pretrained(
+            self.refiner_model_path,
+            trust_remote_code=True,
+            padding_side='left'
+        )
+        if self._refiner_tokenizer.pad_token is None:
+            self._refiner_tokenizer.pad_token = self._refiner_tokenizer.eos_token
+
+        self._refiner_model = AutoModelForCausalLM.from_pretrained(
+            self.refiner_model_path,
+            torch_dtype=torch.bfloat16,
+            device_map="auto",
+            trust_remote_code=True,
+        )
+
+        # Apply LoRA adapter if provided
+        if self.refiner_lora_path:
+            logger.info(f"Loading LoRA adapter from {self.refiner_lora_path}...")
+            self._refiner_model = PeftModel.from_pretrained(
+                self._refiner_model,
+                self.refiner_lora_path,
+            )
+            self._refiner_model = self._refiner_model.merge_and_unload()
+
+        self._refiner_model.eval()
+        logger.info("Refiner model loaded successfully.")
+
+    def _refine_utterance(self, base_utterance: str) -> str:
+        """
+        Refine a base utterance using the trained Refiner model.
+
+        Refinement: u_t ~ pi_theta(· | u_base, R, G_t, D_t, r_t)
+
+        Args:
+            base_utterance: The base utterance u_base from the backend agent.
+
+        Returns:
+            The refined utterance u_t.
+        """
+        self._load_refiner()
+
+        import torch
+
+        # Build the refine prompt
+        if self.refine_prompt_template:
+            prompt_template = self.refine_prompt_template
+        else:
+            # Use built-in default refine prompt
+            from prompt.avalon_prompts import refine_prompt as default_refine_prompt
+            prompt_template = default_refine_prompt
+
+        # Get game context from the wrapped agent
+        agent = self.wrapped_agent
+        game_rules = agent.system_prompt
+        game_state = f"Phase: {agent.phase}"
+        dialog_history = agent.get_conversation_context()
+
+        refine_input = prompt_template.format(
+            game_rules=game_rules,
+            player_name=agent.name,
+            player_role=agent.role,
+            game_state=game_state,
+            dialog_history=dialog_history,
+            base_utterance=base_utterance
+        )
+
+        messages = [
+            {"role": "system", "content": "You are a communication expert specializing in persuasive dialogue refinement for social deduction games."},
+            {"role": "user", "content": refine_input}
+        ]
+
+        # Tokenize and generate
+        input_text = self._refiner_tokenizer.apply_chat_template(
+            messages,
+            tokenize=False,
+            add_generation_prompt=True
+        )
+        input_ids = self._refiner_tokenizer.encode(
+            input_text, return_tensors='pt', add_special_tokens=False
+        )
+        input_ids = input_ids.to(self._refiner_model.device)
+
+        with torch.no_grad():
+            outputs = self._refiner_model.generate(
+                input_ids,
+                max_new_tokens=512,
+                temperature=self.refiner_temperature,
+                do_sample=True,
+                top_p=0.9,
+                pad_token_id=self._refiner_tokenizer.pad_token_id,
+            )
+
+        # Decode only the generated tokens
+        generated_ids = outputs[0][input_ids.shape[1]:]
+        refined_output = self._refiner_tokenizer.decode(generated_ids, skip_special_tokens=True)
+
+        # Extract the response from the refined output
+        # Try to parse "Response: ..." format
+        response_match = re.search(r"Response:\s*(.+)", refined_output, re.S)
+        if response_match:
+            refined = response_match.group(1).strip()
+            # Remove trailing ``` if present
+            refined = re.sub(r'\s*```\s*$', '', refined).strip()
+            if refined:
+                return refined
+
+        # Fallback: try <response>...</response> tags
+        tag_match = re.search(r"<response>(.+?)(?:</response>|$)", refined_output, re.S)
+        if tag_match:
+            return tag_match.group(1).strip()
+
+        # If parsing fails, return the raw output (trimmed)
+        refined = refined_output.strip()
+        if refined:
+            return refined
+
+        # If Refiner output is empty, fall back to base utterance
+        logger.warning("Refiner produced empty output, falling back to base utterance.")
+        return base_utterance
+
+    def step(self, message: str) -> str:
+        """
+        Generate a response using the two-stage pipeline:
+        1. Backend agent generates base utterance u_base
+        2. Refiner refines u_base into persuasive u_t
+
+        Args:
+            message: Input message from the game host.
+
+        Returns:
+            The refined response.
+        """
+        # Step 1: Get base utterance from the wrapped agent
+        base_utterance = self.wrapped_agent.step(message)
+
+        # Step 2: Refine the base utterance
+        t_refine_start = time.time()
+        refined_utterance = self._refine_utterance(base_utterance)
+        t_refine = time.time() - t_refine_start
+
+        # Log the refinement
+        self.wrapped_agent.log(
+            f"{self.wrapped_agent.output_dir}/refiner.txt",
+            f"phase:{self.wrapped_agent.phase}\n"
+            f"base_utterance:\n{base_utterance}\n"
+            f"refined_utterance:\n{refined_utterance}\n"
+            f"refine_time: {t_refine:.2f}s\n"
+            f"--------------------\n"
+        )
+
+        # Display thinking process in watch mode
+        self.wrapped_agent.emit_thinking(
+            "Refiner",
+            f"Base: {base_utterance[:200]}...\nRefined: {refined_utterance[:200]}..."
+        )
+
+        # Update the wrapped agent's conversation history with the refined utterance
+        # (Replace the last entry which was the base utterance)
+        if self.wrapped_agent.conversation_history:
+            last_entry = self.wrapped_agent.conversation_history[-1]
+            if last_entry.get("name") == self.wrapped_agent.name:
+                last_entry["message"] = refined_utterance
+
+        return refined_utterance
+
+    def receive(self, name: str, message: str) -> None:
+        """Delegate to the wrapped agent."""
+        self.wrapped_agent.receive(name, message)
+
+    def set_night_info(self, info: str) -> None:
+        """Delegate to the wrapped agent."""
+        self.wrapped_agent.set_night_info(info)
+
+    def identify_intent(self, next_player: str) -> dict:
+        """Delegate to the wrapped agent."""
+        return self.wrapped_agent.identify_intent(next_player)
+
+    def reflection(self, player_role_mapping: dict, file_name: str, winners: list, duration: int):
+        """Delegate to the wrapped agent."""
+        self.wrapped_agent.reflection(player_role_mapping, file_name, winners, duration)

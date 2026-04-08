@@ -1,0 +1,17 @@
+# Local config files (contain sensitive API keys)
+config.local.json
+config.local.yaml
+user_config.json
+
+# Logs
+logs/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE
+.idea/
+.vscode/
+*.swp

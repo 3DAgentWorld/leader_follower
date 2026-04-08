@@ -262,3 +262,134 @@ role_target = {
     "Morgana": "Win the game by deliberately making the quests fail for three turns, either through yourself or your teammates.",
     "Assassin": "Win the game in one of two ways, 1.deliberately making the quests fail for three turns, either through yourself or your teammates. 2.successfully identifying Merlin."
 }
+
+
+# Intent Identification Prompt
+# Used to identify K desired and K undesired responses from the next player.
+intent_identification_prompt = \
+    """You are an expert social deduction game strategist. 
+
+Your task is to analyze the current game situation and identify strategic communication objectives.
+
+{game_rules}
+
+Your are {player_name} and your role is {player_role}.
+
+Current game state:
+
+{game_state}
+
+Conversation history:
+
+{dialog_history}
+
+Analyze the current situation and identify what you want the next player ({next_player_name}) to say or do in their upcoming turn.
+
+Consider:
+
+1. What response from {next_player_name} would be most beneficial for your win condition?
+
+2. What response would be most harmful to your objectives?
+
+Provide your analysis in the following format:
+
+```
+Strategic Analysis: [Your reasoning about the current situation and what you need to achieve]
+
+Desired Response: [The specific response you want from the next player]
+
+Undesired Response: [The specific response you want to avoid from the next player]
+```"""
+
+
+# Base Utterance Generation Prompt
+# Used by the backend LLM to generate the base utterance u_base.
+base_utterance_prompt = \
+    """You are a skilled social deduction game player with excellent communication abilities.
+
+{game_rules}
+
+Your are {player_name} and your role is {player_role}.
+
+Current game state:
+
+{game_state}
+
+Conversation history:
+
+{dialog_history}
+
+It's your turn to speak, {player_name}. 
+
+Analyze the current situation carefully:
+
+- Consider what information you want to share or withhold
+
+- Think about how to advance your win condition
+
+- Consider how other players might interpret your words
+
+Generate a natural, strategic response that fits your role and the current game context. Your response should be conversational and help achieve your objectives.
+
+Provide your response in the following format:
+
+```
+Response: [Your response]
+```"""
+
+
+# Refine Prompt
+# Used by the Refiner model to refine u_base into a more persuasive version.
+refine_prompt = \
+    """You are a communication expert specializing in persuasive dialogue refinement for social deduction games.
+
+{game_rules}
+
+Your are {player_name} and your role is {player_role}.
+
+Current game state:
+
+{game_state}
+
+Conversation history:
+
+{dialog_history}
+
+You have a base utterance that needs to be refined for maximum persuasive impact:
+
+Base utterance:
+
+{base_utterance}
+
+Your goal is to refine this utterance to be more persuasive while maintaining naturalness and staying true to your role. Consider:
+
+- How to make your message more compelling
+
+- What tone and phrasing would be most convincing
+
+- How to subtly guide other players' thinking
+
+Generate a refined version of the base utterance:
+
+Provide your response in the following format:
+
+```
+Analysis: [Your reasoning about the current situation and what you need to achieve]
+
+Response: [The refined version of the base utterance]
+```"""
+
+
+# Measurer Prompt
+# Used by the Measurer to compute response probabilities.
+# The Measurer simulates a real game player's perspective, so its prompt format
+# must be consistent with the actual game agent's prompt (system_prompt + response_prompt_without_action).
+# This ensures that P_F(response | context) accurately reflects how a real player would respond.
+#
+# Format:
+#   system: system_prompt (game rules + role + strategy, same as normal gameplay)
+#   user: response_prompt_without_action (same as normal gameplay)
+#   assistant: <response>{target_response}</response> (for log probability computation)
+measurer_system_prompt = system_prompt
+
+measurer_user_prompt = response_prompt_without_action

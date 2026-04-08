@@ -1,18 +1,18 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-将 Avalon 游戏日志转换为 verl GRPO 训练数据格式
+Convert Avalon game logs to verl GRPO training data format.
 
-用法：
+Usage:
     python scripts/convert_logs_to_grpo_data.py --log_dir logs/avalon/battle --output output.jsonl
 
-输出格式：
-    每行为一个JSON对象，包含：
-    - prompt: 对话历史（messages格式）
-    - extra_info: 额外信息，包括system_prompt、完整messages、intent信息等
-    - reward_model: 奖励模型配置
-    - data_source: 数据来源
-    - ability: 能力标签
+Output format:
+    Each line is a JSON object containing:
+    - prompt: Refiner's input prompt (messages format, consistent with inference)
+    - extra_info: Additional info including follower_prompt_template, intent info, etc.
+    - reward_model: Reward model configuration
+    - data_source: Data source identifier
+    - ability: Ability tag
 """
 
 import os
@@ -23,11 +23,14 @@ import re
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
 
-# 添加项目根目录到路径
+# Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from prompt.avalon_prompts import (
     system_prompt as avalon_system_prompt_template,
+    refine_prompt as avalon_refine_prompt,
+    measurer_system_prompt as avalon_measurer_system_prompt,
+    measurer_user_prompt as avalon_measurer_user_prompt,
     role_introduction,
     role_target,
     init_strategies
@@ -36,13 +39,13 @@ from prompt.avalon_prompts import (
 
 def extract_player_info(player_key: str) -> Tuple[str, str]:
     """
-    从日志key中提取玩家名称和角色
+    Extract player name and role from a log key.
     
     Args:
-        player_key: 如 "player 2(Morgana)" 格式的key
+        player_key: Key in format "player 2(Morgana)".
     
     Returns:
-        Tuple[player_name, role]: 如 ("player 2", "Morgana")
+        Tuple[player_name, role]: e.g. ("player 2", "Morgana").
     """
     match = re.match(r"(player \d+)\(([^)]+)\)", player_key)
     if match:
@@ -53,17 +56,17 @@ def extract_player_info(player_key: str) -> Tuple[str, str]:
 def build_system_prompt(name: str, role: str, strategy: str = None, 
                         suggestion: str = "", other_strategy: str = "") -> str:
     """
-    构建系统提示词
+    Build the game system prompt for a player.
     
     Args:
-        name: 玩家名称
-        role: 玩家角色
-        strategy: 玩家策略
-        suggestion: 建议（来自之前游戏的经验）
-        other_strategy: 其他角色的策略
+        name: Player name.
+        role: Player role.
+        strategy: Player strategy.
+        suggestion: Suggestion from previous game experience.
+        other_strategy: Strategy for other roles.
     
     Returns:
-        格式化后的系统提示词
+        Formatted system prompt.
     """
     if strategy is None:
         strategy = init_strategies.get(role, "Play strategically to help your side win.")
@@ -78,24 +81,24 @@ def build_system_prompt(name: str, role: str, strategy: str = None,
 
 
 def build_role_intro_prompt(role: str) -> str:
-    """获取角色介绍"""
+    """Get the role introduction text."""
     return role_introduction.get(role.lower(), "")
 
 
 def build_game_goal(role: str) -> str:
-    """获取游戏目标"""
+    """Get the game goal for a role."""
     return role_target.get(role, "Win the game for your side.")
 
 
 def parse_process_json(process_file: str) -> Dict[str, List[Dict]]:
     """
-    解析 process.json 文件
+    Parse a process.json file.
     
     Args:
-        process_file: process.json文件路径
+        process_file: Path to the process.json file.
     
     Returns:
-        解析后的游戏日志，按回合组织
+        Parsed game log data, organized by rounds.
     """
     with open(process_file, 'r', encoding='utf-8') as f:
         return json.load(f)
@@ -103,10 +106,10 @@ def parse_process_json(process_file: str) -> Dict[str, List[Dict]]:
 
 def extract_player_mapping(process_data: Dict) -> Dict[str, str]:
     """
-    从日志中提取玩家名称到角色的映射
+    Extract player name to role mapping from the log data.
     
     Returns:
-        Dict[player_name, role]: 如 {"player 1": "Loyal Servant", ...}
+        Dict[player_name, role]: e.g. {"player 1": "Loyal Servant", ...}
     """
     player_mapping = {}
     
@@ -124,190 +127,167 @@ def extract_player_mapping(process_data: Dict) -> Dict[str, str]:
 def build_dialogue_summary(process_data: Dict, current_round: str, 
                            current_event_idx: int) -> str:
     """
-    构建到当前事件为止的对话历史摘要（文本格式）
+    Build a dialogue history summary (text format) up to the current event.
     
-    按照 Avalon 的实际请求格式，对话历史是以文本摘要的形式嵌入的：
-    格式为 "host: xxx" 和 "player X: xxx"
+    Format: "host: xxx" and "player X: xxx"
     
     Args:
-        process_data: 完整的游戏日志
-        current_round: 当前回合key
-        current_event_idx: 当前事件在回合中的索引
+        process_data: Full game log data.
+        current_round: Current round key.
+        current_event_idx: Index of the current event in the round.
     
     Returns:
-        对话历史摘要文本
+        Dialogue history summary text.
     """
     summary_lines = []
     rounds = list(process_data.keys())
     current_round_idx = rounds.index(current_round)
     
-    # 遍历所有之前的回合
+    # Iterate over all previous rounds
     for i in range(current_round_idx + 1):
         round_key = rounds[i]
         events = process_data[round_key]
         
-        # 如果是当前回合，只处理到当前事件
+        # If current round, only process up to the current event
         max_idx = current_event_idx if round_key == current_round else len(events)
         
         for j in range(max_idx):
             event = events[j]
             
-            # 提取Host消息
+            # Extract Host messages
             if "Host" in event:
                 summary_lines.append(f"host: {event['Host']}")
             
-            # 提取玩家消息
+            # Extract player messages
             for key, value in event.items():
                 if key.startswith("player ") and "(" in key:
                     player_name, role = extract_player_info(key)
-                    if player_name and value:  # 排除空响应
+                    if player_name and value:  # Skip empty responses
                         summary_lines.append(f"{player_name}: {value}")
     
     return "\n".join(summary_lines)
 
 
-def build_dialogue_context(process_data: Dict, current_round: str, 
-                          current_event_idx: int,
-                          current_player_name: str = None) -> List[Dict[str, str]]:
-    """
-    构建到当前事件为止的对话历史（兼容旧接口，但实际不使用）
-    
-    注意：这个函数保留用于兼容，但实际的 Avalon 格式是将历史嵌入到 user 消息中
-    
-    Args:
-        process_data: 完整的游戏日志
-        current_round: 当前回合key
-        current_event_idx: 当前事件在回合中的索引
-        current_player_name: 当前玩家名称（不使用）
-    
-    Returns:
-        空列表（因为历史会嵌入到 user 消息中）
-    """
-    # 返回空列表，因为历史会作为 summary 嵌入到 user 消息中
-    return []
-
-
-def build_avalon_user_message(
-    host_question: str,
-    summary: str = "",
-    player_name: str = "",
-    role: str = "",
-    plan: str = "",
-    actions: str = ""
-) -> str:
-    """
-    构建 Avalon 格式的 user 消息
-    
-    按照实际的请求格式，包含：
-    - information: 玩家信息
-    - environment: 环境状态（包括 summary）
-    - question: Host 的问题
-    
-    Args:
-        host_question: Host 的问题/指令
-        summary: 之前回合的摘要
-        player_name: 玩家名称
-        role: 玩家角色
-        plan: 玩家的计划
-        actions: 当前动作
-    
-    Returns:
-        格式化的 user 消息
-    """
-    parts = []
-    
-    # 添加玩家信息
-    if player_name and role:
-        parts.append(f"the information of yourself is <information>")
-        parts.append(f"your name is <name>{player_name}</name>")
-        parts.append(f"your role is <role>{role}</role>")
-        role_intro = build_role_intro_prompt(role)
-        if role_intro:
-            parts.append(f"the role introduction is <introduction>{role_intro}</introduction>")
-        strategy = init_strategies.get(role, "")
-        if strategy:
-            parts.append(f"your playing strategy <strategy>{strategy}</strategy>")
-        parts.append("</information>")
-    
-    # 添加环境状态
-    parts.append("the environment state is <environment>")
-    if summary:
-        parts.append(f"the summary of previous turns <summary> {summary} </summary>")
-    else:
-        parts.append("the summary of previous turns <summary> None </summary>")
-    
-    if plan:
-        parts.append(f"your current playing plan is <plan> {plan} </plan>")
-    
-    parts.append(f"the Host's question is <question> {host_question} </question>")
-    
-    if actions:
-        parts.append(f"current actions <actions>{actions}</actions>")
-    
-    parts.append("</environment>")
-    
-    return "\n".join(parts)
-
-
-# leader 发言的占位符
+# Leader response placeholder
 LEADER_RESPONSE_PLACEHOLDER = "{{LEADER_RESPONSE}}"
 
 
-def build_follower_prompt_template(
+def build_refiner_prompt(
+    player_name: str,
+    player_role: str,
+    game_rules: str,
+    game_state: str,
+    dialog_history: str,
+    base_utterance: str
+) -> List[Dict[str, str]]:
+    """
+    Build the Refiner's input prompt (consistent with RefinerWrapper._refine_utterance at inference).
+    
+    The Refiner takes u_base and context as input, and outputs a refined utterance u_t.
+    This prompt format must match the inference-time format exactly.
+    
+    Args:
+        player_name: Player name.
+        player_role: Player role.
+        game_rules: Game rules text (the system_prompt of the game).
+        game_state: Current game state description.
+        dialog_history: Dialogue history text.
+        base_utterance: The base utterance u_base generated by the backend LLM.
+    
+    Returns:
+        Messages list in the Refiner's prompt format.
+    """
+    refine_input = avalon_refine_prompt.format(
+        game_rules=game_rules,
+        player_name=player_name,
+        player_role=player_role,
+        game_state=game_state,
+        dialog_history=dialog_history,
+        base_utterance=base_utterance
+    )
+
+    messages = [
+        {"role": "system", "content": "You are a communication expert specializing in persuasive dialogue refinement for social deduction games."},
+        {"role": "user", "content": refine_input}
+    ]
+
+    return messages
+
+
+def build_measurer_prompt_template(
     process_data: Dict,
     round_key: str,
     current_event_idx: int,
     leader_name: str,
     follower_name: str,
     follower_role: str,
-    follower_system_prompt: str,
+    follower_strategy: str,
     current_host_instruction: str = "",
     next_host_instruction: str = ""
 ) -> List[Dict[str, str]]:
     """
-    构建 follower 的 prompt template，leader 发言处使用占位符
+    Build the Measurer's prompt template for computing follower response log probabilities.
     
-    按照 Avalon 的实际请求格式：
-    - system: 游戏规则和角色设定
-    - user: 包含 summary 的环境信息和 Host 问题，leader 发言处为占位符
+    The Measurer simulates a real game player's perspective, so its prompt format
+    must be consistent with the actual game agent's prompt:
+    - system: system_prompt (game rules + role + strategy, same as normal gameplay)
+    - user: response_prompt_without_action (same as normal gameplay)
+    
+    The leader's utterance is represented by {{LEADER_RESPONSE}} placeholder,
+    which is substituted during reward computation.
     
     Args:
-        process_data: 完整的游戏日志
-        round_key: 当前回合key
-        current_event_idx: leader 事件的索引
-        leader_name: leader 玩家名称
-        follower_name: follower 玩家名称
-        follower_role: follower 的角色
-        follower_system_prompt: follower 的系统提示词
-        current_host_instruction: 当前（leader）的 Host 指令
-        next_host_instruction: follower 收到的 Host 指令
+        process_data: Full game log data.
+        round_key: Current round key.
+        current_event_idx: Index of the leader's event.
+        leader_name: Leader player name.
+        follower_name: Follower player name.
+        follower_role: Follower's role.
+        follower_strategy: Follower's playing strategy.
+        current_host_instruction: Host instruction for the leader.
+        next_host_instruction: Host instruction for the follower.
     
     Returns:
-        follower 的 prompt template（messages 格式），leader 发言处为 {{LEADER_RESPONSE}} 占位符
+        Measurer's prompt template (messages format) with {{LEADER_RESPONSE}} placeholder.
     """
-    # 1. 构建到 leader 发言之前的对话摘要
+    # 1. Build dialogue history (summary) up to the leader's utterance
     summary = build_dialogue_summary(
         process_data, round_key, current_event_idx
     )
     
-    # 2. 添加 leader 收到的 Host 指令和 leader 发言的占位符到 summary
+    # 2. Append the leader's Host instruction and leader utterance placeholder
     if current_host_instruction:
         summary += f"\nhost: {current_host_instruction}"
-    # 使用占位符代替实际的 leader 发言
     summary += f"\n{leader_name}: {LEADER_RESPONSE_PLACEHOLDER}"
     
-    # 3. 构建 user 消息
-    user_message = build_avalon_user_message(
-        host_question=next_host_instruction if next_host_instruction else "Please respond.",
-        summary=summary,
-        player_name=follower_name,
-        role=follower_role
+    # 3. Build system prompt (same as normal gameplay agent)
+    system_content = avalon_measurer_system_prompt.format(
+        name=follower_name,
+        role=follower_role,
+        strategy=follower_strategy,
+        suggestion="",
+        other_strategy=""
     )
     
-    # 4. 构建完整的 messages
+    # 4. Build user prompt (same as normal gameplay agent: response_prompt_without_action)
+    follower_introduction = role_introduction.get(follower_role.lower(), "")
+    question = next_host_instruction if next_host_instruction else "Please share your thoughts on the current situation."
+    
+    user_content = avalon_measurer_user_prompt.format(
+        name=follower_name,
+        phase=f"discussion, Round: {round_key}",
+        role=follower_role,
+        introduction=follower_introduction,
+        strategy=follower_strategy,
+        summary=summary,
+        plan="None",
+        question=question
+    )
+    
+    # 5. Build complete messages
     messages = [
-        {"role": "system", "content": follower_system_prompt},
-        {"role": "user", "content": user_message}
+        {"role": "system", "content": system_content},
+        {"role": "user", "content": user_content}
     ]
     
     return messages
@@ -322,20 +302,24 @@ def convert_discuss_event_to_training_sample(
     game_dir: str
 ) -> Optional[Dict[str, Any]]:
     """
-    将讨论事件转换为训练样本
+    Convert a discussion event into a training sample.
+    
+    The training sample contains:
+    - prompt: Refiner's input (consistent with inference-time RefinerWrapper)
+    - extra_info: Measurer's prompt template (consistent with reward_server)
     
     Args:
-        event: 当前事件
-        process_data: 完整游戏日志
-        round_key: 当前回合key
-        event_idx: 事件索引
-        player_mapping: 玩家名称到角色的映射
-        game_dir: 游戏日志目录
+        event: The current event.
+        process_data: Full game log data.
+        round_key: Current round key.
+        event_idx: Event index.
+        player_mapping: Player name to role mapping.
+        game_dir: Game log directory.
     
     Returns:
-        训练样本或None
+        Training sample dict or None.
     """
-    # 找到当前说话的玩家
+    # Find the current speaker (leader)
     speaker_key = None
     speaker_response = None
     
@@ -348,7 +332,7 @@ def convert_discuss_event_to_training_sample(
     if not speaker_key or not speaker_response:
         return None
     
-    # 跳过空响应
+    # Skip empty responses
     if not speaker_response.strip():
         return None
     
@@ -356,41 +340,41 @@ def convert_discuss_event_to_training_sample(
     if not player_name or not role:
         return None
     
-    # 构建系统提示词
-    system_prompt = build_system_prompt(
+    # Build game rules (the system prompt serves as game rules context)
+    game_rules = build_system_prompt(
         name=player_name,
         role=role,
         strategy=init_strategies.get(role)
     )
     
-    # 构建对话历史摘要
-    summary = build_dialogue_summary(
+    # Build dialogue history summary
+    dialog_history = build_dialogue_summary(
         process_data, round_key, event_idx
     )
     
-    # 添加当前Host指令
+    # Add current Host instruction to dialog history
     host_instruction = event.get("Host", "")
+    if host_instruction:
+        dialog_history += f"\nhost: {host_instruction}"
     
-    # 构建 user 消息（按照 Avalon 的实际格式）
-    user_message = build_avalon_user_message(
-        host_question=host_instruction,
-        summary=summary,
+    # Build game state
+    game_state = f"Phase: discussion, Round: {round_key}"
+    
+    # The speaker's actual response serves as the base utterance (u_base)
+    # During self-play data collection, u_base = u_t (no Refiner applied)
+    base_utterance = speaker_response
+    
+    # ===== Build Refiner's prompt (consistent with inference) =====
+    prompt = build_refiner_prompt(
         player_name=player_name,
-        role=role
+        player_role=role,
+        game_rules=game_rules,
+        game_state=game_state,
+        dialog_history=dialog_history,
+        base_utterance=base_utterance
     )
     
-    # 构建messages
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_message}
-    ]
-    
-    # 构建prompt（用于推理）
-    prompt = messages.copy()
-    
-    # 查找下一个说话的玩家（作为follower）
-    rounds = list(process_data.keys())
-    current_round_idx = rounds.index(round_key)
+    # Find the next speaker (follower)
     round_events = process_data[round_key]
     
     next_speaker_key = None
@@ -399,7 +383,6 @@ def convert_discuss_event_to_training_sample(
     next_response = None
     next_event_idx = None
     
-    # 查找下一个说话的事件
     for i in range(event_idx + 1, len(round_events)):
         next_event = round_events[i]
         for key, value in next_event.items():
@@ -415,52 +398,48 @@ def convert_discuss_event_to_training_sample(
         if next_speaker_key:
             break
     
-    # 如果没有找到下一个玩家，跳过这个样本（无法计算reward）
+    # If no next player found, skip this sample (cannot compute reward)
     if not next_speaker_key:
         return None
     
-    # ===== 构建 follower 的 prompt template 用于计算 reward =====
-    # 按照论文方法，需要用 follower 的视角计算 P_F(response | context)
-    # leader 发言处使用占位符 {{LEADER_RESPONSE}}，方便计算 GRPO reward 时替换
+    # ===== Build Measurer's prompt template for reward computation =====
+    # This is the follower's prompt used by the Measurer to compute P_F(response | context)
+    # The Measurer uses the same prompt format as a real game player
     
-    # 1. 构建 follower 的 system prompt
-    follower_system_prompt = build_system_prompt(
-        name=next_speaker_name,
-        role=next_speaker_role,
-        strategy=init_strategies.get(next_speaker_role)
-    )
+    # 1. Get follower's strategy
+    follower_strategy = init_strategies.get(next_speaker_role, "Play strategically to help your side win.")
     
-    # 2. 查找 next_event 中的 Host 指令
+    # 2. Find Host instruction in next_event
     next_event = round_events[next_event_idx]
     next_host_instruction = next_event.get("Host", "")
     
-    # 3. 构建 follower 的 prompt template（带占位符）
-    follower_prompt_template = build_follower_prompt_template(
+    # 3. Build Measurer's prompt template (with placeholder)
+    follower_prompt_template = build_measurer_prompt_template(
         process_data=process_data,
         round_key=round_key,
         current_event_idx=event_idx,
         leader_name=player_name,
         follower_name=next_speaker_name,
         follower_role=next_speaker_role,
-        follower_system_prompt=follower_system_prompt,
+        follower_strategy=follower_strategy,
         current_host_instruction=host_instruction,
         next_host_instruction=next_host_instruction
     )
     
-    # extra_info 只包含 follower 的 prompt template
-    # leader 发言处为 {{LEADER_RESPONSE}} 占位符，计算 reward 时替换成 leader sample 出的发言
+    # Build extra_info
     extra_info = {
         "follower_prompt_template": follower_prompt_template,
+        "base_utterance": base_utterance,
     }
     
-    # 如果有intent信息，添加到extra_info中
+    # Add intent info to extra_info if available
     if "intent_identification" in event:
         extra_info["intent_identification"] = event["intent_identification"]
     
-    # reward_model 只包含 style 和 ground_truth
+    # reward_model contains style and ground_truth
     reward_model = {
         "style": "rule",
-        "ground_truth": next_response,  # follower 的实际响应
+        "ground_truth": next_response,  # Follower's actual response
     }
     
     return {
@@ -479,23 +458,23 @@ def convert_game_logs_to_grpo_data(
     include_intent: bool = True
 ):
     """
-    将游戏日志转换为GRPO训练数据
+    Convert game logs to GRPO training data.
     
     Args:
-        log_dir: 日志目录（包含多个游戏目录）
-        output_file: 输出文件路径
-        only_discuss: 是否只处理讨论阶段的数据
-        include_intent: 是否包含intent_identification信息
+        log_dir: Log directory (containing one or more game directories).
+        output_file: Output file path.
+        only_discuss: Whether to only process discussion phase data.
+        include_intent: Whether to include intent_identification info.
     """
     samples = []
     
-    # 查找所有游戏目录
+    # Find all game directories
     log_path = Path(log_dir)
     game_dirs = []
     
-    # 支持两种目录结构：
-    # 1. log_dir 直接包含 process.json
-    # 2. log_dir 下有多个游戏子目录
+    # Support two directory structures:
+    # 1. log_dir directly contains process.json
+    # 2. log_dir has multiple game subdirectories
     if (log_path / "process.json").exists():
         game_dirs = [log_path]
     else:
@@ -503,38 +482,38 @@ def convert_game_logs_to_grpo_data(
             if item.is_dir() and (item / "process.json").exists():
                 game_dirs.append(item)
     
-    print(f"找到 {len(game_dirs)} 个游戏目录")
+    print(f"Found {len(game_dirs)} game directories")
     
     for game_dir in game_dirs:
         process_file = game_dir / "process.json"
-        print(f"处理: {process_file}")
+        print(f"Processing: {process_file}")
         
         try:
             process_data = parse_process_json(str(process_file))
         except Exception as e:
-            print(f"  警告: 无法解析 {process_file}: {e}")
+            print(f"  Warning: Failed to parse {process_file}: {e}")
             continue
         
-        # 提取玩家映射
+        # Extract player mapping
         player_mapping = extract_player_mapping(process_data)
-        print(f"  玩家映射: {player_mapping}")
+        print(f"  Player mapping: {player_mapping}")
         
-        # 遍历所有回合和事件
+        # Iterate over all rounds and events
         for round_key, events in process_data.items():
             for event_idx, event in enumerate(events):
-                # 判断是否为讨论事件
+                # Check if this is a discussion event
                 is_discuss_event = "discuss" in event.get("Host", "").lower() or \
                                    "speak" in event.get("Host", "").lower()
                 
                 if only_discuss and not is_discuss_event:
                     continue
                 
-                # 检查是否有intent_identification（如果需要）
+                # Check if intent_identification is present (if required)
                 if include_intent and "intent_identification" not in event:
-                    # 如果要求包含intent但事件中没有，跳过或继续处理
+                    # If intent is required but not present, skip or continue
                     pass
                 
-                # 转换为训练样本
+                # Convert to training sample
                 sample = convert_discuss_event_to_training_sample(
                     event=event,
                     process_data=process_data,
@@ -547,9 +526,9 @@ def convert_game_logs_to_grpo_data(
                 if sample:
                     samples.append(sample)
     
-    print(f"生成 {len(samples)} 个训练样本")
+    print(f"Generated {len(samples)} training samples")
     
-    # 写入输出文件
+    # Write output file
     output_path = Path(output_file)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     
@@ -557,7 +536,7 @@ def convert_game_logs_to_grpo_data(
         for sample in samples:
             f.write(json.dumps(sample, ensure_ascii=False) + '\n')
     
-    print(f"输出保存到: {output_file}")
+    print(f"Output saved to: {output_file}")
     
     return samples
 
@@ -568,21 +547,21 @@ def convert_single_game(
     only_discuss: bool = True
 ) -> List[Dict]:
     """
-    转换单个游戏的日志
+    Convert a single game's logs.
     
     Args:
-        game_dir: 单个游戏的日志目录
-        output_file: 输出文件路径（可选）
-        only_discuss: 是否只处理讨论阶段
+        game_dir: Single game's log directory.
+        output_file: Output file path (optional).
+        only_discuss: Whether to only process discussion phase.
     
     Returns:
-        训练样本列表
+        List of training samples.
     """
     game_path = Path(game_dir)
     process_file = game_path / "process.json"
     
     if not process_file.exists():
-        raise FileNotFoundError(f"找不到 process.json: {process_file}")
+        raise FileNotFoundError(f"process.json not found: {process_file}")
     
     process_data = parse_process_json(str(process_file))
     player_mapping = extract_player_mapping(process_data)
@@ -619,36 +598,36 @@ def convert_single_game(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="将 Avalon 游戏日志转换为 verl GRPO 训练数据格式"
+        description="Convert Avalon game logs to verl GRPO training data format"
     )
     parser.add_argument(
         "--log_dir",
         type=str,
         required=True,
-        help="游戏日志目录，可以是单个游戏目录或包含多个游戏的父目录"
+        help="Game log directory (single game dir or parent dir containing multiple games)"
     )
     parser.add_argument(
         "--output",
         type=str,
         default="grpo_training_data.jsonl",
-        help="输出文件路径（默认: grpo_training_data.jsonl）"
+        help="Output file path (default: grpo_training_data.jsonl)"
     )
     parser.add_argument(
         "--only_discuss",
         action="store_true",
         default=True,
-        help="是否只处理讨论阶段的数据（默认: True）"
+        help="Only process discussion phase data (default: True)"
     )
     parser.add_argument(
         "--all_phases",
         action="store_true",
-        help="处理所有阶段的数据（覆盖 --only_discuss）"
+        help="Process all phases (overrides --only_discuss)"
     )
     parser.add_argument(
         "--include_intent",
         action="store_true",
         default=True,
-        help="是否包含intent_identification信息（默认: True）"
+        help="Include intent_identification info (default: True)"
     )
     
     args = parser.parse_args()

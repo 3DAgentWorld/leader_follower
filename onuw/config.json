@@ -1,0 +1,39 @@
+{
+    "game": {
+        "player_nums": 5,
+        "language": "english",
+        "mode": "watch",
+        "game_count": 10,
+        "start_game_idx": 0,
+        "exp_name": "battle",
+        "camp": null,
+        "output_dir": "logs/onuw/battle",
+        "max_discuss_round": 3,
+        "enable_intent_identification": false
+    },
+    "default_model": {
+        "model_name": "gpt-5-mini",
+        "api_key": "your-api-key-here",
+        "api_base": null,
+        "temperature": 0.3
+    },
+    "players": [
+        {"name": "player 1", "role": null, "agent_type": "direct", "model": null},
+        {"name": "player 2", "role": null, "agent_type": "direct", "model": null},
+        {"name": "player 3", "role": null, "agent_type": "direct", "model": null},
+        {"name": "player 4", "role": null, "agent_type": "direct", "model": null},
+        {"name": "player 5", "role": null, "agent_type": "direct", "model": null}
+    ],
+    "roles": ["Werewolf", "Villager", "Villager", "Seer", "Robber", "Troublemaker", "Insomniac"],
+    "extractors": {
+        "model_name": null,
+        "api_key": null,
+        "api_base": null,
+        "temperature": 0
+    },
+    "refiner": {
+        "model_path": "/path/to/Qwen2.5-7B-Instruct",
+        "lora_path": "/path/to/lora-checkpoint",
+        "temperature": 0.7
+    }
+}

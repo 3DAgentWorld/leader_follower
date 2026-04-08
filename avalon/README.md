@@ -1,111 +1,127 @@
-### 1. Install Requirements
+# Avalon
+
+## Quick Start
+
+### 1. Install Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Config
+### 2. Configure
 
-复制并修改配置文件：
+Copy and edit the configuration file:
 
 ```bash
 cp config.json my_config.json
 ```
 
-编辑 `my_config.json`，设置API Key、API Base和其他参数
+Edit `my_config.json` to set your API key, model name, and other parameters.
 
 ### 3. Run
 
 ```bash
-python run_avalon_battle.py -c config.json
+python run_avalon_battle.py -c my_config.json
 ```
 
-在 watch 模式下，非 `direct` 类型的 Agent 会用青色显示中间思考过程。
+In watch mode, non-`direct` agents display intermediate thinking processes in cyan.
 
-## Config说明
+## Game Rules
 
-```json
+**Avalon** is a social deduction game with 6 players divided into two teams:
+- **Good Team** (4 players): Merlin, Percival, and 2 Loyal Servants.
+- **Evil Team** (2 players): Morgana and Assassin.
+
+**Merlin** knows the identities of all evil players. **Percival** knows who Merlin and Morgana are, but cannot distinguish between them. **Morgana** can pretend to be Merlin to confuse Percival.
+
+**Game Flow**: The game consists of up to 5 quest rounds. Each round, a leader proposes a team for the quest → All players vote to approve/reject → If approved, team members secretly choose to support or sabotage the quest. Good players must support; evil players can choose either.
+
+**Victory**: Good team wins by completing 3 successful quests. Evil team wins by failing 3 quests. However, if the good team wins, the **Assassin** gets one chance to guess Merlin's identity — if correct, the evil team wins instead.
+
+## Configuration
+
+```jsonc
 {
     "game": {
-        "player_nums": 6,           // 玩家数量
-        "language": "english",      // 语言 (english/chinese)
-        "mode": "watch",            // 模式（watch 模式会显示中间思考过程）
-        "game_count": 10,           // 游戏局数
-        "start_game_idx": 0,        // 起始游戏索引
-        "exp_name": "battle",       // 实验名称
-        "camp": "good",             // 阵营 (good/evil/null表示不过滤)
-        "output_dir": "logs/avalon/battle",  // 输出目录
-        "enable_intent_identification": false  // 是否启用意图识别（识别期望/不期望后置位玩家的发言）
+        "player_nums": 6,                    // Number of players
+        "language": "english",               // Language (english/chinese)
+        "mode": "watch",                     // Mode (watch: display thinking process)
+        "game_count": 10,                    // Number of games to run
+        "start_game_idx": 0,                 // Starting game index
+        "exp_name": "battle",                // Experiment name
+        "camp": "good",                      // Camp filter (good/evil/null for no filter)
+        "output_dir": "logs/avalon/battle",  // Output directory
+        "enable_intent_identification": false // Enable intent identification (for training data collection)
     },
     "default_model": {
-        "model_name": "gpt-4o",  // 默认模型
-        "api_key": "your-api-key-here",      // API Key
-        "api_base": null,                    // API Base
-        "temperature": 0.3                   // 温度参数
+        "model_name": "gpt-5-mini",              // Default backend LLM
+        "api_key": "your-api-key-here",      // API key
+        "api_base": null,                    // Custom API base URL (optional)
+        "temperature": 0.3                   // Temperature
     },
     "players": [
         {
-            "name": "player 1",              // 玩家名称
-            "role": null,                    // 角色（null 表示随机分配）
-            "agent_type": "direct",          // Agent 类型 (direct/react/recon/lasi)
-            "model": {                       // 单独为该玩家配置模型（可选）
-                "model_name": "gpt-4o",
-                "api_key": "another-api-key",
-                "api_base": "https://custom-api.example.com/v1",
-                "temperature": 0.5
-            }
-        },
-        // ... 其他玩家
+            "name": "player 1",
+            "role": null,                    // Role (null = random assignment)
+            "agent_type": "react",   // Agent type
+            "model": null                    // Per-player model override (optional)
+        }
+        // ... more players
     ],
     "roles": ["Merlin", "Percival", "Loyal Servant", "Loyal Servant", "Morgana", "Assassin"],
     "extractors": {
-        "model_name": "gpt-4o",
-        "api_key": null,        // null 表示使用 default_model 的配置
+        "model_name": null,                  // null = use default_model
+        "api_key": null,
         "api_base": null,
         "temperature": 0
+    },
+    "refiner": {                             // Refiner configuration (required for refiner+ agents)
+        "model_path": "/path/to/Qwen2.5-7B-Instruct",
+        "lora_path": "/path/to/lora-checkpoint",  // LoRA adapter path (optional)
+        "temperature": 0.7
     }
 }
 ```
 
----
+## Agent Types
 
-## 训练流程
+| Agent Type | Description | API Calls |
+|-----------|-------------|-----------|
+| `direct` | Direct response generation | 1 |
+| `react` | ReAct framework (Reasoning + Acting) | 2 |
+| `recon` | ReCon framework (cross-player relation analysis) | 3 |
+| `lasi` | LASI framework | 4 |
+| `refiner+<type>` | Wraps any agent type with a trained Refiner model | +1 |
 
-训练流程包含以下步骤：
+Examples: `refiner+react`, `refiner+direct`, `refiner+lasi`
 
-1. **数据收集**：启用 Intent Identification 运行游戏，收集对话日志
-2. **数据转换**：将游戏日志转换为 GRPO 训练格式
-3. **启动 Reward Server**：加载 Qwen2.5-72B-Instruct 模型计算 Reward
-4. **GRPO 训练**：使用 verl 框架进行训练
+## Training Pipeline
 
-### Step 1: 收集数据
+### Step 1: Collect Self-Play Data
 
-首先需要启用 `enable_intent_identification` 开关来生成包含 intent 信息的对话数据。
-
-修改 `config.json`：
+Enable `enable_intent_identification` to generate training data with intent information:
 
 ```json
 {
     "game": {
-        ...
-        "enable_intent_identification": true  // 启用意图识别
+        "enable_intent_identification": true
     }
 }
 ```
 
-运行游戏收集数据：
+Run games to collect data:
 
 ```bash
 python run_avalon_battle.py -c config.json
 ```
 
-每局游戏会生成一个目录，包含 `process.json` 文件。启用 Intent Identification 后，每个讨论事件会包含：
-- `desired_responses`: 3 个期望 follower 说的话
-- `undesired_responses`: 3 个不期望 follower 说的话
+Each game generates a directory containing `process.json`. With intent identification enabled, each discussion event includes:
+- `desired_responses`: 3 desired follower responses (K=3)
+- `undesired_responses`: 3 undesired follower responses (K=3)
 
-### Step 2: 转换格式
+### Step 2: Convert to Training Format
 
-使用转换脚本将游戏日志转换为 verl GRPO 训练格式：
+Convert game logs to GRPO training format:
 
 ```bash
 python scripts/convert_logs_to_grpo_data.py \
@@ -114,36 +130,47 @@ python scripts/convert_logs_to_grpo_data.py \
     --include_intent
 ```
 
-### Step 3: 启动 Reward Server
+### Step 3: Start Reward Server
 
-Reward Server 使用本地 LLM（Qwen2.5-72B-Instruct）作为 Measurer，计算 follower 响应的 log probability
+The Reward Server uses a local LLM (Qwen2.5-72B-Instruct) as the Measurer to compute follower response log probabilities:
 
 ```bash
+pip install fastapi uvicorn
+
 python scripts/reward_server.py \
     --model_path /path/to/Qwen2.5-72B-Instruct \
     --port 8000 \
     --torch_dtype bfloat16
 ```
 
-**检查是否启动成功**
+Verify the server is running:
 
 ```bash
 curl http://localhost:8000/health
 ```
 
-### Step 4: 配置 verl 训练
+### Step 4: GRPO Training
 
-将 `scripts/rewards.py` 替换到 verl 的 reward function 配置中
+We use [ms-swift](https://github.com/modelscope/ms-swift) for GRPO training. Replace `scripts/rewards.py` as the reward function in your training config.
 
 ```bash
-# 配置 Reward Server 地址（如果不是本地 127.0.0.1:8000）
+# Set Reward Server address (if not localhost:8000)
 export REWARD_SERVER_HOST=127.0.0.1
 export REWARD_SERVER_PORT=8000
 ```
 
-```bash
-# 使用 verl 进行训练
-python -m verl.trainer.main_ppo \
-    --config your_verl_config.yaml \
-    --data_path grpo_training_data.jsonl
+### Step 5: Inference with Trained Refiner
+
+After training, set the `refiner` config in your game configuration to use the trained checkpoint:
+
+```json
+{
+    "refiner": {
+        "model_path": "/path/to/Qwen2.5-7B-Instruct",
+        "lora_path": "/path/to/trained-lora-checkpoint",
+        "temperature": 0.7
+    }
+}
 ```
+
+Then set any player's `agent_type` to `refiner+<base_type>` (e.g., `refiner+react`).

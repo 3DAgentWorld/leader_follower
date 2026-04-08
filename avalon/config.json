@@ -8,12 +8,13 @@
         "exp_name": "demo",
         "camp": null,
         "output_dir": "logs/avalon/battle",
-        "enable_intent_identification": true
+        "enable_intent_identification": false
     },
     "default_model": {
-        "model_name": "gemini-3-flash-preview",
-        "api_key": null,
-        "api_base": null
+        "model_name": "gpt-5-mini",
+        "api_key": "your-api-key-here",
+        "api_base": null,
+        "temperature": 0.3
     },
     "players": [
         {"name": "player 1", "role": null, "agent_type": "direct", "model": null},
@@ -29,5 +30,10 @@
         "api_key": null,
         "api_base": null,
         "temperature": 0
+    },
+    "refiner": {
+        "model_path": "/path/to/Qwen2.5-7B-Instruct",
+        "lora_path": null,
+        "temperature": 0.7
     }
 }

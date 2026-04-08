@@ -103,7 +103,7 @@ class Avalon(Game):
 
         self.response_rule = response_rule
         
-        # 是否启用意图识别（论文中的Intent Identification）
+        # Whether to enable intent identification
         self.enable_intent_identification = kwargs.get('enable_intent_identification', False)
 
     def init_extractor(self, player_extractor: Tuple[Type[Extractor], dict], vote_extractor: Tuple[Type[Extractor], dict],
@@ -169,71 +169,119 @@ class Avalon(Game):
         task_confirm = False
         task_members_idx = []
         retry = 0
-        while not task_confirm and retry < 5:
-            # 公开发言
+        max_retry = 5
+        if self.language == 'chinese':
+            print_text_animated(
+                Fore.YELLOW + f"\n{'='*60}\n[第 {game_round} 轮] 开始组队阶段（最多 {max_retry} 次尝试）\n{'='*60}\n\n")
+        else:
+            print_text_animated(
+                Fore.YELLOW + f"\n{'='*60}\n[Round {game_round}] Starting team selection phase (max {max_retry} attempts)\n{'='*60}\n\n")
+        while not task_confirm and retry < max_retry:
+            if self.language == 'chinese':
+                print_text_animated(
+                    Fore.YELLOW + f"\n--- [第 {game_round} 轮] 第 {retry + 1}/{max_retry} 次投票 ---\n\n")
+            else:
+                print_text_animated(
+                    Fore.YELLOW + f"\n--- [Round {game_round}] Vote attempt {retry + 1}/{max_retry} ---\n\n")
+    # Public discussion
             self.discuss()
 
-            # 选择执行任务的玩家
+    # Select quest team members
             task_members_idx = self.select()
             if len(task_members_idx) < self.task_member.get(str(self.game_round)):
                 retry += 1
 
-            # 公开投票
+    # Public vote
             task_confirm = self.vote(task_members_idx)
+            if not task_confirm:
+                if self.language == 'chinese':
+                    print_text_animated(
+                        Fore.YELLOW + f"\n[第 {game_round} 轮] 第 {retry + 1}/{max_retry} 次投票被否决。"
+                        f"{'重新投票...' if retry + 1 < max_retry else '已达最大尝试次数，强制执行任务。'}\n\n")
+                else:
+                    print_text_animated(
+                        Fore.YELLOW + f"\n[Round {game_round}] Vote attempt {retry + 1}/{max_retry} REJECTED. "
+                        f"{'Retrying...' if retry + 1 < max_retry else 'Max attempts reached, forcing quest execution.'}\n\n")
             retry += 1
 
-        # 执行任务
-        # 如果选人数量不足，则随机选人，保证游戏正常进行
+    # Execute quest
+        # If team size is insufficient, randomly select to keep the game going
         if len(task_members_idx) < self.task_member.get(str(self.game_round)):
+            if self.language == 'chinese':
+                print_text_animated(
+                    Fore.YELLOW + f"\n[第 {game_round} 轮] 队伍人数不足，随机选择成员。\n\n")
+            else:
+                print_text_animated(
+                    Fore.YELLOW + f"\n[Round {game_round}] Team size insufficient, randomly selecting members.\n\n")
             task_members_idx = random.sample(
                 ['1', '2', '3', '4', '5', '6'], k=self.task_member.get(str(self.game_round))
             )
+        if self.language == 'chinese':
+            print_text_animated(
+                Fore.YELLOW + f"\n{'='*60}\n[第 {game_round} 轮] 执行任务，队伍成员："
+                f"{['玩家 ' + str(idx) for idx in task_members_idx]}\n{'='*60}\n\n")
+        else:
+            print_text_animated(
+                Fore.YELLOW + f"\n{'='*60}\n[Round {game_round}] Executing quest with team: "
+                f"{['player ' + str(idx) for idx in task_members_idx]}\n{'='*60}\n\n")
         task_success = self.execute(task_members_idx)
 
-        # 刺客指认梅林
+    # Assassin identifies Merlin
         if self.assassin_kill:
             kill, kill_success = self.assassinate()
             if kill:
                 self.assassin_kill = False
 
             if kill and kill_success:
+                if self.language == 'chinese':
+                    win_msg = "红色阵营获胜。"
+                else:
+                    win_msg = "Evil Side wins."
                 self.process_list.append(
-                    {"Host": "Evil Side wins."}
+                    {"Host": win_msg}
                 )
                 for player_i in self.alive_players:
                     self.players[player_i].receive(
-                        name="Host", message=f"quest phase, round {self.game_round}|Evil Side wins.")
+                        name="Host", message=f"quest phase, round {self.game_round}|{win_msg}")
                 self.winners = ["Morgana", "Assassin"]
-                # 游戏结束
+                # Game ends
                 return False
 
         self.handle_round_ending(task_success)
         if self.check_game_end():
             if self.good_score >= 3:
+                if self.language == 'chinese':
+                    win_msg = "蓝色阵营获胜。"
+                else:
+                    win_msg = "Good Side wins."
                 self.process_list.append(
-                    {"Host": "Good Side wins."}
+                    {"Host": win_msg}
                 )
                 for player_i in self.alive_players:
                     self.players[player_i].receive(
-                        name="Host", message=f"quest phase, round {self.game_round}|Good Side wins.")
+                        name="Host", message=f"quest phase, round {self.game_round}|{win_msg}")
                 self.winners = ["Merlin", "Loyal Servant", "Percival"]
             else:
+                if self.language == 'chinese':
+                    win_msg = "红色阵营获胜。"
+                else:
+                    win_msg = "Evil Side wins."
                 self.process_list.append(
-                    {"Host": "Evil Side wins."}
+                    {"Host": win_msg}
                 )
                 for player_i in self.alive_players:
                     self.players[player_i].receive(
-                        name="Host", message=f"quest phase, round {self.game_round}|Evil Side wins.")
+                        name="Host", message=f"quest phase, round {self.game_round}|{win_msg}")
                 self.winners = ["Morgana", "Assassin"]
         return not self.check_game_end()
 
     def night_process(self):
         """
-        简化的夜晚流程：
-        - 不调用 receive()，直接将夜晚信息设置到玩家的系统提示中
-        - 彻底避免 API 调用，信息会在第一次 step() 时通过系统提示传递
+        Simplified night process:
+        - Does not call receive(), directly sets night info into player's system prompt
+        - Completely avoids API calls; info is passed via system prompt on first step()
         """
-        # 根据语言设置选择打印信息
+        # Select print messages based on language setting
         if self.language == 'chinese':
             night_start_msg = "[夜晚阶段] 分发角色信息..."
             night_end_msg = "[夜晚阶段结束] 所有玩家睁眼，游戏开始！"
@@ -243,13 +291,13 @@ class Avalon(Game):
         
         print_text_animated(Fore.WHITE + f"Host:\n\n{night_start_msg}\n\n")
         
-        # 为每个玩家设置夜晚信息
+        # Set night info for each player
         for player_i in self.alive_players:
             role = self.player_mapping[player_i]
             night_info = ""
             
             if role in self.evil_side:
-                # 邪恶阵营：知道队友
+            # Evil side: knows teammates
                 other_evil_players = []
                 for player_j, role_j in self.player_mapping.items():
                     if role_j in self.evil_side and player_j != player_i:
@@ -257,26 +305,26 @@ class Avalon(Game):
                 night_info = f"[Night Phase Info] You are on the EVIL side. Your evil teammate(s): {', '.join(other_evil_players)}. Work together to sabotage quests and identify Merlin."
                 
             elif role == self.role_mapping['merlin']:
-                # 梅林：看到所有邪恶玩家
+                # Merlin: sees all evil players
                 evil_players = [player_j for player_j, role_j in self.player_mapping.items() if role_j in self.evil_side]
                 night_info = f"[Night Phase Info] As Merlin, you can see the evil players: {', '.join(evil_players)}. You don't know their specific roles. Guide your team subtly without revealing yourself to the Assassin."
                 
             elif role == self.role_mapping['percival']:
-                # 派西维尔：看到梅林和莫甘娜（但不知道谁是谁）
+                # Percival: sees Merlin and Morgana (but doesn't know which is which)
                 morgana_player = None
                 for player_x, role_x in self.player_mapping.items():
                     if role_x == self.role_mapping['morgana']:
                         morgana_player = player_x
                         break
                 candidates = [self.merlin_player, morgana_player]
-                random.shuffle(candidates)  # 打乱顺序
+                random.shuffle(candidates)  # Shuffle order
                 night_info = f"[Night Phase Info] As Percival, you can see {candidates[0]} and {candidates[1]} - one is Merlin, one is Morgana, but you don't know which is which. Try to identify the real Merlin and protect them."
                 
             else:
-                # 忠臣：无特殊信息
+                # Loyal Servant: no special information
                 night_info = "[Night Phase Info] As a Loyal Servant, you have no special information from the night phase. Use discussion and voting patterns to identify evil players."
             
-            # 设置夜晚信息到玩家
+            # Set night info for the player
             self.players[player_i].set_night_info(night_info)
             print_text_animated(Fore.WHITE + f"  {player_i}({role}): Night info set.\n")
         
@@ -296,7 +344,10 @@ class Avalon(Game):
             while game_continue:
                 self.game_round = game_round
                 instruction = f'round {game_round} starts:'
-                print_text_animated(Fore.WHITE + f"System:\n\n{instruction}\n\n")
+                if self.language == 'chinese':
+                    print_text_animated(Fore.WHITE + f"系统:\n\n第 {game_round} 轮开始：\n\n")
+                else:
+                    print_text_animated(Fore.WHITE + f"System:\n\n{instruction}\n\n")
                 game_continue = self.run_round(game_round)
                 # if game_continue:
                 #     self.agents_summary()
@@ -315,7 +366,7 @@ class Avalon(Game):
     def discuss(self):
         discuss_prompt = self.host_instruction.get('discuss_prompt', '')
         discuss_order = copy.deepcopy(self.alive_players)
-        # 确定发言顺序
+        # Determine speaking order
         if self.task_leader is None:
             self.task_leader = random.choice(discuss_order)
         else:
@@ -336,25 +387,25 @@ class Avalon(Game):
                                                 '、'.join(discuss_order),
                                                 discuss_order[0]) + discuss_prompt2.format(player_i)
             
-            # Intent Identification: 识别希望和不希望后置位玩家说的内容
+            # Intent Identification: identify desired and undesired responses from the next player
             intent_info = None
             if self.enable_intent_identification and idx < len(discuss_order) - 1:
-                # 下一个发言的玩家
+                # Next player to speak
                 next_player = discuss_order[idx + 1]
-                # 调用agent的intent identification方法
+                # Call agent's intent identification method
                 intent_info = self.players[player_i].identify_intent(next_player)
             
             output = self.players[player_i].step(message=f"quest phase, round {self.game_round}|" + instruction)
             print_text_animated(COLOR[player_i] + f"{player_i}({self.player_mapping[player_i]}):\n\n{output}\n\n")
 
-            # 构建日志条目
+            # Build log entry
             log_entry = {
                 'Host': instruction,
                 f"{player_i}({self.player_mapping[player_i]})": output,
                 "response_rule": res_rule
             }
             
-            # 如果启用了意图识别，添加到日志中
+            # If intent identification is enabled, add to log
             if intent_info is not None:
                 log_entry["intent_identification"] = intent_info
             
@@ -383,9 +434,9 @@ class Avalon(Game):
                     f"Question：{instruction}\nAnswer：{output}")
             else:
                 s = output
-            pattern = '\d+'
+            pattern = r'\d+'
             task_members_idx = re.findall(pattern, s)
-            # 检查是否超过可选玩家
+            # Check for out-of-range player indices
             illegal_idx = []
             for idx in task_members_idx:
                 if int(idx) > 6:
@@ -421,7 +472,7 @@ class Avalon(Game):
                 s = self.vote_extractor.step(
                     f"Question: {instruction}Answer: {output}"
                 )
-                # 如果没有明确的态度，认为赞成，促进游戏往下进行
+                # If no clear stance, assume agreement to keep the game progressing
                 vote = 'false' in s or 'False' in s
             else:
                 pattern = '反对'
@@ -448,7 +499,19 @@ class Avalon(Game):
         instruction = vote_summary.format(','.join([f"{player_i}: {v}" for player_i, v in all_vote_mapping.items()]))
         for player_i in self.alive_players:
             self.players[player_i].receive("host", f"quest phase, round {self.game_round}|" + instruction)
-        task_confirm = all_votes.count(True) / len(all_votes) >= 1 / 2
+        agree_count = all_votes.count(True)
+        disagree_count = all_votes.count(False)
+        task_confirm = agree_count / len(all_votes) >= 1 / 2
+        if self.language == 'chinese':
+            vote_status = "通过" if task_confirm else "否决"
+            print_text_animated(
+                Fore.YELLOW + f"\n[投票结果] {vote_status} — 同意：{agree_count}，反对：{disagree_count} "
+                f"({', '.join(f'{p}:{v}' for p, v in all_vote_mapping.items())})\n\n")
+        else:
+            vote_status = "APPROVED" if task_confirm else "REJECTED"
+            print_text_animated(
+                Fore.YELLOW + f"\n[Vote Result] {vote_status} — Agree: {agree_count}, Disagree: {disagree_count} "
+                f"({', '.join(f'{p}:{v}' for p, v in all_vote_mapping.items())})\n\n")
         if not task_confirm:
             instruction = self.host_instruction.get("vote_again", "")
             for player_i in self.alive_players:
@@ -471,7 +534,7 @@ class Avalon(Game):
                 s = self.quest_extractor.step(
                     f"Question: {instruction}\nAnswer: {output}"
                 )
-                # 如果没有明确的态度，认为使任务失败（更利于红色阵营）
+                # If no clear stance, assume quest failure (favors evil side)
                 vote = 'false' in s or 'False' in s
             else:
                 pattern = '失败'
@@ -532,9 +595,9 @@ class Avalon(Game):
                     f"Question: {instruction}\nAnswer: {output}")
             else:
                 s = output
-            kill_player_idx = re.findall('\d+', s)
+            kill_player_idx = re.findall(r'\d+', s)
             if not kill_player_idx:
-                # 视作不刺杀
+                # Treat as no assassination attempt
                 return False, False
             else:
                 kill_success = True if self.merlin_player == f"player {kill_player_idx[0]}" else False
@@ -558,6 +621,20 @@ class Avalon(Game):
             self.good_score += 1
         else:
             self.evil_score += 1
+        if self.language == 'chinese':
+            result_str = "成功（蓝方 +1）" if task_success else "失败（红方 +1）"
+            print_text_animated(
+                Fore.YELLOW + f"\n{'='*60}\n"
+                f"[第 {self.game_round} 轮结果] 任务{result_str}\n"
+                f"[比分] 蓝方：{self.good_score} | 红方：{self.evil_score}\n"
+                f"{'='*60}\n\n")
+        else:
+            result_str = "SUCCESS (Good +1)" if task_success else "FAILED (Evil +1)"
+            print_text_animated(
+                Fore.YELLOW + f"\n{'='*60}\n"
+                f"[Round {self.game_round} Result] Quest {result_str}\n"
+                f"[Score] Good: {self.good_score} | Evil: {self.evil_score}\n"
+                f"{'='*60}\n\n")
 
     def check_game_end(self):
         return max(self.good_score, self.evil_score) >= 3

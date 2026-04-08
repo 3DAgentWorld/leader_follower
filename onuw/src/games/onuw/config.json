@@ -1,0 +1,141 @@
+{
+  "player_nums": [5],
+  "english": {
+    "role_mapping": {
+      "werewolf": "Werewolf",
+      "villager": "Villager",
+      "seer": "Seer",
+      "robber": "Robber",
+      "troublemaker": "Troublemaker",
+      "insomniac": "Insomniac"
+    },
+    "role_introduce": {
+      "werewolf": "The Werewolf belongs to Team Werewolf. During the night phase, the Werewolf wakes up to check if other Werewolves are present among the players.",
+      "villager": "The Villager belongs to Team Village. Villagers have no special abilities or night actions but serve as the baseline good role.",
+      "seer": "The Seer belongs to Team Village. During the night phase, the Seer may examine either one other player's role or two roles from the center pool.",
+      "robber": "The Robber belongs to Team Village initially. During the night phase, the Robber may exchange their role with another player and then view their new role.",
+      "troublemaker": "The Troublemaker belongs to Team Village. During the night phase, the Troublemaker may swap the roles of two other players without viewing them.",
+      "insomniac": "The Insomniac belongs to Team Village. The Insomniac views their own role at the end of the night phase to detect any changes."
+    },
+    "config_5": {
+      "game_introduce": "Game Setup:\nOne Night Ultimate Werewolf (ONUW) is played with 5 players and 7 roles. Each player receives one role, and the remaining 2 roles are placed in the center pool. The available roles are: 1 Werewolf, 2 Villagers, 1 Seer, 1 Robber, 1 Troublemaker, and 1 Insomniac. Exactly one Werewolf is always distributed among the five players.\n\nVictory Conditions:\nTeam Village wins if the Werewolf is eliminated during voting.\nTeam Werewolf wins if the Werewolf avoids elimination.\nIf no Werewolf exists among players (both in center) and no one dies, Team Village wins.\n\nGame Flow:\nThe game has three sequential phases:\n1. Night Phase: Players with night abilities act in order: Werewolf, Seer, Robber, Troublemaker, Insomniac.\n2. Day Phase: All players discuss openly for multiple rounds to identify suspected Werewolves.\n3. Voting Phase: All players simultaneously vote to eliminate one player. The player with the most votes is eliminated.",
+      "role_pool": ["Werewolf", "Villager", "Villager", "Seer", "Robber", "Troublemaker", "Insomniac"],
+      "werewolf_team": ["Werewolf"],
+      "village_team": ["Villager", "Seer", "Robber", "Troublemaker", "Insomniac"]
+    },
+    "host_instruction": {
+      "game_start": "Welcome to One Night Ultimate Werewolf. Each player has been assigned a role. Now close your eyes for the night phase.",
+      "werewolf_wake": "Werewolves, wake up and look for other Werewolves.",
+      "werewolf_info_solo": "You are the only Werewolf among the players. No other Werewolves are present.",
+      "werewolf_info_team": "The Werewolves among the players are: {werewolves}.",
+      "seer_wake": "Werewolves, close your eyes. Seer, wake up. You may check one other player's role or two roles in the center pool.",
+      "seer_check_player": "The role of {target} is {role}.",
+      "seer_check_center": "The two roles you checked in the center pool are: {role1} and {role2}.",
+      "robber_wake": "Seer, close your eyes. Robber, wake up. You may swap your role with another player and then view your new role.",
+      "robber_swap_result": "You swapped your role with {target}. Your new role is {new_role}.",
+      "robber_no_swap": "You chose not to swap with anyone. You remain the Robber.",
+      "troublemaker_wake": "Robber, close your eyes. Troublemaker, wake up. You may swap the roles of two other players.",
+      "troublemaker_swap_result": "You swapped the roles of {player1} and {player2}.",
+      "troublemaker_no_swap": "You chose not to swap anyone's roles.",
+      "insomniac_wake": "Troublemaker, close your eyes. Insomniac, wake up and check your final role.",
+      "insomniac_result": "Your final role is {role}.",
+      "day_start": "Night phase ends. Everyone, wake up! Now we will start the discussion phase. All players will speak in order: {speak_order}.",
+      "discuss_speak": "{player}, it is your turn to speak. Share your thoughts on who might be the Werewolf.",
+      "discuss_new_round": "Discussion round {round_num} ends, there are {rounds_left} rounds left. Let's begin a new round, starting with {first_player}.",
+      "vote_prompt": "Discussion is over. All players, please vote for the player you believe is most likely the Werewolf. You cannot vote for yourself.",
+      "vote_result_eliminate": "The votes are in: {vote_summary}. {target} received the most votes and is eliminated. {target}'s final role is {role}.",
+      "vote_result_tie": "The votes are in: {vote_summary}. There is a tie. {targets} received the most votes and are all eliminated.",
+      "vote_result_no_majority": "The votes are in: {vote_summary}. Since players with the most votes only got 1 vote, no one is eliminated.",
+      "game_over_village_wins": "Game over. The Werewolf has been eliminated. Team Village wins!",
+      "game_over_werewolf_wins": "Game over. The Werewolf was not eliminated. Team Werewolf wins!",
+      "game_over_draw": "Game over. No Werewolf exists among the players. It's a draw."
+    },
+    "response_rule": {
+      "seer_check": {
+        "type": "text"
+      },
+      "robber_swap": {
+        "type": "text"
+      },
+      "troublemaker_swap": {
+        "type": "text"
+      },
+      "discuss_speak": {
+        "type": "text"
+      },
+      "vote_prompt": {
+        "type": "number",
+        "count": "1"
+      }
+    }
+  },
+  "chinese": {
+    "role_mapping": {
+      "werewolf": "狼人",
+      "villager": "村民",
+      "seer": "预言家",
+      "robber": "强盗",
+      "troublemaker": "捣蛋鬼",
+      "insomniac": "失眠者"
+    },
+    "role_introduce": {
+      "werewolf": "狼人属于狼人阵营。在夜间阶段，狼人醒来查看其他玩家中是否有其他狼人。",
+      "villager": "村民属于村庄阵营。村民没有特殊能力或夜间行动，是基础的好人角色。",
+      "seer": "预言家属于村庄阵营。在夜间阶段，预言家可以查看一名其他玩家的角色，或者查看中央池中的两张角色牌。",
+      "robber": "强盗初始属于村庄阵营。在夜间阶段，强盗可以将自己的角色与另一名玩家交换，然后查看自己的新角色。",
+      "troublemaker": "捣蛋鬼属于村庄阵营。在夜间阶段，捣蛋鬼可以交换两名其他玩家的角色，但不能查看这些角色。",
+      "insomniac": "失眠者属于村庄阵营。失眠者在夜间阶段结束时查看自己的角色，以检测是否发生了变化。"
+    },
+    "config_5": {
+      "game_introduce": "游戏设置：\n一夜终极狼人（ONUW）由5名玩家和7个角色进行游戏。每名玩家获得一个角色，剩余2个角色放入中央池。可用角色为：1个狼人、2个村民、1个预言家、1个强盗、1个捣蛋鬼和1个失眠者。5名玩家中恰好有1个狼人。\n\n胜利条件：\n村庄阵营：在投票阶段淘汰狼人则获胜。\n狼人阵营：狼人在投票中未被淘汰则获胜。\n如果玩家中没有狼人（两个都在中央池）且无人被淘汰，则村庄阵营获胜。\n\n游戏流程：\n游戏分为三个阶段：\n1. 夜间阶段：拥有夜间能力的玩家按顺序行动：狼人、预言家、强盗、捣蛋鬼、失眠者。\n2. 白天阶段：所有玩家进行多轮公开讨论，以找出疑似狼人。\n3. 投票阶段：所有玩家同时投票淘汰一名玩家。得票最多的玩家被淘汰。",
+      "role_pool": ["狼人", "村民", "村民", "预言家", "强盗", "捣蛋鬼", "失眠者"],
+      "werewolf_team": ["狼人"],
+      "village_team": ["村民", "预言家", "强盗", "捣蛋鬼", "失眠者"]
+    },
+    "host_instruction": {
+      "game_start": "欢迎来到一夜终极狼人。每位玩家已被分配角色。现在请闭眼，进入夜间阶段。",
+      "werewolf_wake": "狼人请睁眼，查看是否有其他狼人。",
+      "werewolf_info_solo": "你是玩家中唯一的狼人，没有其他狼人。",
+      "werewolf_info_team": "玩家中的狼人有：{werewolves}。",
+      "seer_wake": "狼人请闭眼。预言家请睁眼。你可以查看一名其他玩家的角色，或者查看中央池中的两张牌。",
+      "seer_check_player": "{target}的角色是{role}。",
+      "seer_check_center": "你查看的中央池中的两个角色是：{role1}和{role2}。",
+      "robber_wake": "预言家请闭眼。强盗请睁眼。你可以将自己的角色与另一名玩家交换，然后查看你的新角色。",
+      "robber_swap_result": "你与{target}交换了角色。你的新角色是{new_role}。",
+      "robber_no_swap": "你选择不与任何人交换。你仍然是强盗。",
+      "troublemaker_wake": "强盗请闭眼。捣蛋鬼请睁眼。你可以交换两名其他玩家的角色。",
+      "troublemaker_swap_result": "你交换了{player1}和{player2}的角色。",
+      "troublemaker_no_swap": "你选择不交换任何人的角色。",
+      "insomniac_wake": "捣蛋鬼请闭眼。失眠者请睁眼，查看你的最终角色。",
+      "insomniac_result": "你的最终角色是{role}。",
+      "day_start": "夜间阶段结束。所有人请睁眼！现在开始讨论阶段。所有玩家将按以下顺序发言：{speak_order}。",
+      "discuss_speak": "{player}，轮到你发言了。请分享你对谁可能是狼人的看法。",
+      "discuss_new_round": "第{round_num}轮讨论结束，还剩{rounds_left}轮。让我们开始新一轮讨论，从{first_player}开始。",
+      "vote_prompt": "讨论结束。所有玩家请投票选出你认为最可能是狼人的玩家。你不能投给自己。",
+      "vote_result_eliminate": "投票结果：{vote_summary}。{target}获得最多票数，被淘汰。{target}的最终角色是{role}。",
+      "vote_result_tie": "投票结果：{vote_summary}。出现平票。{targets}获得最多票数，全部被淘汰。",
+      "vote_result_no_majority": "投票结果：{vote_summary}。由于得票最多的玩家仅获得1票，无人被淘汰。",
+      "game_over_village_wins": "游戏结束。狼人已被淘汰。村庄阵营获胜！",
+      "game_over_werewolf_wins": "游戏结束。狼人未被淘汰。狼人阵营获胜！",
+      "game_over_draw": "游戏结束。玩家中没有狼人。平局。"
+    },
+    "response_rule": {
+      "seer_check": {
+        "type": "text"
+      },
+      "robber_swap": {
+        "type": "text"
+      },
+      "troublemaker_swap": {
+        "type": "text"
+      },
+      "discuss_speak": {
+        "type": "text"
+      },
+      "vote_prompt": {
+        "type": "number",
+        "count": "1"
+      }
+    }
+  }
+}

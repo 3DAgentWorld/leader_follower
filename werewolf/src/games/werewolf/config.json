@@ -1,0 +1,141 @@
+{
+  "player_nums": [7],
+  "english": {
+    "role_mapping": {
+      "werewolf": "Werewolf",
+      "seer": "Seer",
+      "guardian": "Guardian",
+      "villager": "Villager"
+    },
+    "role_introduce": {
+      "werewolf": "The Werewolf belongs to the Werewolf team. During the night phase, Werewolves collectively choose a player to eliminate. Werewolves know each other's identities and must coordinate their actions.",
+      "seer": "The Seer belongs to the Village team. During the night phase, the Seer can investigate one living player to determine whether they are a Werewolf.",
+      "guardian": "The Guardian belongs to the Village team. During the night phase, the Guardian can protect one living player (including themselves) from elimination.",
+      "villager": "The Villager belongs to the Village team. Villagers have no special abilities but contribute to the team through discussion and voting."
+    },
+    "config_7": {
+      "game_introduce": "Game Setup:\nWerewolf is played with seven players, each assuming a specific role: 2 Werewolves, 1 Seer, 1 Guardian, and 3 Villagers. The Werewolves belong to the Werewolf team, while the Seer, Guardian, and Villagers belong to the Village team. At the beginning of the game, Werewolves learn each other's identities, while other players only know their own role.\n\nVictory Conditions:\nVillage Team: Eliminate both Werewolves.\nWerewolf Team: Survive until the number of Werewolves equals or exceeds the remaining Village team members.\n\nGame Flow:\nThe game alternates between Night Phase and Day Phase.\nNight Phase: Werewolves choose a target to eliminate. The Seer investigates one player. The Guardian protects one player. If the Guardian protects the Werewolves' target, no one is eliminated.\nDay Phase: Night results are announced. All surviving players discuss openly, each speaking once. Then all surviving players vote to eliminate one player (or abstain). The player with the most votes is eliminated. Ties are resolved randomly.",
+      "role": ["Werewolf", "Werewolf", "Seer", "Guardian", "Villager", "Villager", "Villager"],
+      "werewolf_team": ["Werewolf"],
+      "village_team": ["Seer", "Guardian", "Villager"]
+    },
+    "host_instruction": {
+      "night_start": "Night falls. All players close your eyes.",
+      "night_end": "Dawn breaks. All players open your eyes.",
+      "werewolf_kill_prompt": "Werewolves, open your eyes and choose a player to eliminate tonight. You cannot choose yourself, your teammate, or dead players. Please state the player number.",
+      "werewolf_kill_confirm": "Your teammate {proposer} proposes to eliminate {target} tonight. Do you agree with this target? Answer yes or no. If no, please suggest an alternative target.",
+      "werewolf_kill_solo": "You are the only surviving Werewolf. Choose a player to eliminate tonight. You cannot choose yourself or dead players. Please state the player number.",
+      "seer_investigate": "Seer, open your eyes. Choose a living player to investigate. You cannot investigate yourself or dead players. Please state the player number.",
+      "seer_result_werewolf": "Your investigation result: {target} IS a Werewolf.",
+      "seer_result_not_werewolf": "Your investigation result: {target} is NOT a Werewolf.",
+      "guardian_protect": "Guardian, open your eyes. Choose a living player to protect tonight (you can choose yourself). Please state the player number.",
+      "day_announce_kill": "{target} was eliminated by the Werewolves last night.",
+      "day_announce_no_kill": "No one was eliminated last night. The Guardian successfully protected the target.",
+      "discuss_prompt": "Day {day_num} discussion begins. All surviving players will speak in order: {speak_order}. Share your thoughts on who might be a Werewolf.",
+      "discuss_speak": "{player}, it is your turn to speak.",
+      "vote_prompt": "Discussion is over. All surviving players, please vote for the player you want to eliminate, or choose to abstain. The player with the most votes will be eliminated.",
+      "vote_result_eliminate": "The votes are in: {vote_summary}. {target} received the most votes and is eliminated.",
+      "vote_result_tie": "The votes are in: {vote_summary}. There is a tie. {target} is randomly selected for elimination.",
+      "vote_result_no_eliminate": "The votes are in: {vote_summary}. No player received enough votes. No one is eliminated today.",
+      "game_over_village_wins": "Both Werewolves have been eliminated. The Village team wins!",
+      "game_over_werewolf_wins": "The Werewolves now equal or outnumber the Village team. The Werewolf team wins!"
+    },
+    "response_rule": {
+      "werewolf_kill_prompt": {
+        "type": "number",
+        "count": "1"
+      },
+      "werewolf_kill_confirm": {
+        "type": "bool"
+      },
+      "werewolf_kill_solo": {
+        "type": "number",
+        "count": "1"
+      },
+      "seer_investigate": {
+        "type": "number",
+        "count": "1"
+      },
+      "guardian_protect": {
+        "type": "number",
+        "count": "1"
+      },
+      "discuss_speak": {
+        "type": "text"
+      },
+      "vote_prompt": {
+        "type": "number",
+        "count": "1"
+      }
+    }
+  },
+  "chinese": {
+    "role_mapping": {
+      "werewolf": "狼人",
+      "seer": "预言家",
+      "guardian": "守卫",
+      "villager": "村民"
+    },
+    "role_introduce": {
+      "werewolf": "狼人属于狼人阵营。在夜间阶段，狼人们共同选择一名玩家进行淘汰。狼人之间互相知道身份，必须协调行动。",
+      "seer": "预言家属于村庄阵营。在夜间阶段，预言家可以查验一名存活玩家，确认其是否为狼人。",
+      "guardian": "守卫属于村庄阵营。在夜间阶段，守卫可以保护一名存活玩家（包括自己）免于被淘汰。",
+      "villager": "村民属于村庄阵营。村民没有特殊能力，但通过讨论和投票为团队做出贡献。"
+    },
+    "config_7": {
+      "game_introduce": "游戏设置：\n狼人杀由7名玩家进行游戏，每名玩家扮演一个特定角色：2个狼人、1个预言家、1个守卫和3个村民。狼人属于狼人阵营，而预言家、守卫和村民属于村庄阵营。游戏开始时，狼人互相知道对方的身份，而其他玩家只知道自己的角色。\n\n胜利条件：\n村庄阵营：淘汰所有狼人。\n狼人阵营：存活到狼人数量等于或超过剩余村庄阵营成员数量。\n\n游戏流程：\n游戏在夜间阶段和白天阶段之间交替进行。\n夜间阶段：狼人选择一名目标进行淘汰。预言家查验一名玩家。守卫保护一名玩家。如果守卫保护了狼人的目标，则无人被淘汰。\n白天阶段：公布夜间结果。所有存活玩家进行公开讨论，每人发言一次。然后所有存活玩家投票淘汰一名玩家（或弃权）。得票最多的玩家被淘汰。平票时随机决定。",
+      "role": ["狼人", "狼人", "预言家", "守卫", "村民", "村民", "村民"],
+      "werewolf_team": ["狼人"],
+      "village_team": ["预言家", "守卫", "村民"]
+    },
+    "host_instruction": {
+      "night_start": "天黑了，请所有玩家闭眼。",
+      "night_end": "天亮了，请所有玩家睁眼。",
+      "werewolf_kill_prompt": "狼人请睁眼，选择今晚要淘汰的玩家。你不能选择自己、队友或已死亡的玩家。请说出玩家编号。",
+      "werewolf_kill_confirm": "你的队友{proposer}提议今晚淘汰{target}。你同意这个目标吗？回答是或否。如果不同意，请提出替代目标。",
+      "werewolf_kill_solo": "你是唯一存活的狼人。选择今晚要淘汰的玩家。你不能选择自己或已死亡的玩家。请说出玩家编号。",
+      "seer_investigate": "预言家请睁眼。选择一名存活玩家进行查验。你不能查验自己或已死亡的玩家。请说出玩家编号。",
+      "seer_result_werewolf": "你的查验结果：{target}是狼人。",
+      "seer_result_not_werewolf": "你的查验结果：{target}不是狼人。",
+      "guardian_protect": "守卫请睁眼。选择今晚要保护的一名存活玩家（可以选择自己）。请说出玩家编号。",
+      "day_announce_kill": "{target}昨晚被狼人淘汰了。",
+      "day_announce_no_kill": "昨晚无人被淘汰。守卫成功保护了目标。",
+      "discuss_prompt": "第{day_num}天讨论开始。所有存活玩家将按以下顺序发言：{speak_order}。请分享你对谁可能是狼人的看法。",
+      "discuss_speak": "{player}，轮到你发言了。",
+      "vote_prompt": "讨论结束。所有存活玩家请投票选出你要淘汰的玩家，或选择弃权。得票最多的玩家将被淘汰。",
+      "vote_result_eliminate": "投票结果：{vote_summary}。{target}获得最多票数，被淘汰。",
+      "vote_result_tie": "投票结果：{vote_summary}。出现平票。{target}被随机选中淘汰。",
+      "vote_result_no_eliminate": "投票结果：{vote_summary}。没有玩家获得足够票数。今天无人被淘汰。",
+      "game_over_village_wins": "两名狼人都已被淘汰。村庄阵营获胜！",
+      "game_over_werewolf_wins": "狼人数量已等于或超过村庄阵营成员。狼人阵营获胜！"
+    },
+    "response_rule": {
+      "werewolf_kill_prompt": {
+        "type": "number",
+        "count": "1"
+      },
+      "werewolf_kill_confirm": {
+        "type": "bool"
+      },
+      "werewolf_kill_solo": {
+        "type": "number",
+        "count": "1"
+      },
+      "seer_investigate": {
+        "type": "number",
+        "count": "1"
+      },
+      "guardian_protect": {
+        "type": "number",
+        "count": "1"
+      },
+      "discuss_speak": {
+        "type": "text"
+      },
+      "vote_prompt": {
+        "type": "number",
+        "count": "1"
+      }
+    }
+  }
+}

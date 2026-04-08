@@ -1,0 +1,50 @@
+{
+    "game": {
+        "task_split": "hard",
+        "language": "english",
+        "mode": "watch",
+        "game_count": 10,
+        "start_game_idx": 0,
+        "exp_name": "battle",
+        "output_dir": "logs/sotopia/battle",
+        "max_turns": 20,
+        "max_stale_turns": 2,
+        "evaluate": true,
+        "evaluator_model": null,
+        "data_dir": null,
+        "enable_intent_identification": false
+    },
+    "default_model": {
+        "model_name": "gpt-5-mini",
+        "api_key": "your-api-key-here",
+        "api_base": null,
+        "temperature": 0.3
+    },
+    "agents": [
+        {
+            "agent_type": "direct",
+            "model": null
+        },
+        {
+            "agent_type": "direct",
+            "model": null
+        }
+    ],
+    "evaluator": {
+        "model_name": null,
+        "api_key": null,
+        "api_base": null,
+        "temperature": 0
+    },
+    "extractors": {
+        "model_name": null,
+        "api_key": null,
+        "api_base": null,
+        "temperature": 0
+    },
+    "refiner": {
+        "model_path": "/path/to/Qwen2.5-7B-Instruct",
+        "lora_path": "/path/to/lora-checkpoint",
+        "temperature": 0.7
+    }
+}
