@@ -37,6 +37,12 @@ session.mount('http://', adapter)
 # Leader response placeholder (consistent with convert_logs_to_grpo_data.py)
 LEADER_RESPONSE_PLACEHOLDER = "{{LEADER_RESPONSE}}"
 
+# Length penalty configuration
+# Linear penalty starts beyond LENGTH_PENALTY_MIN_WORDS; full penalty at LENGTH_PENALTY_MAX_WORDS
+LENGTH_PENALTY_MIN_WORDS = 100
+LENGTH_PENALTY_MAX_WORDS = 200
+LENGTH_PENALTY_MAX = 10.0  # Max additive penalty (additive to avoid sign issues with multiplicative decay)
+
 
 def my_reward_function(
     data_sources: List[str],
@@ -103,9 +109,9 @@ def my_reward_function(
         print(f'[Reward API Exception] {e}')
         rewards = [DEFAULT_REWARD_VALUE for _ in range(len(solution_strs))]
     
-    # Post-processing: ensure rewards are within reasonable range
+    # Post-processing: ensure rewards are within reasonable range, and apply length penalty
     final_rewards = []
-    for reward in rewards:
+    for i, reward in enumerate(rewards):
         try:
             reward = float(reward)
         except (ValueError, TypeError):
@@ -113,6 +119,17 @@ def my_reward_function(
         
         # Clamp reward to avoid numerical instability
         reward = max(-50.0, min(50.0, reward))
+        
+        # Length penalty: penalize overly long leader utterances
+        word_count = len(solution_strs[i].split())
+        if word_count > LENGTH_PENALTY_MIN_WORDS:
+            if word_count >= LENGTH_PENALTY_MAX_WORDS:
+                penalty = -LENGTH_PENALTY_MAX
+            else:
+                # Linear interpolation from 0 to -LENGTH_PENALTY_MAX
+                penalty = -LENGTH_PENALTY_MAX * (word_count - LENGTH_PENALTY_MIN_WORDS) / (LENGTH_PENALTY_MAX_WORDS - LENGTH_PENALTY_MIN_WORDS)
+            reward += penalty
+        
         final_rewards.append(reward)
     
     return final_rewards
