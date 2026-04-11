@@ -15,6 +15,9 @@
 <!-- Hero Section -->
 <section class="hero">
     <div class="hero-bg"></div>
+    <div class="hero-orb hero-orb-1"></div>
+    <div class="hero-orb hero-orb-2"></div>
+    <div class="hero-orb hero-orb-3"></div>
     <div class="container">
         <h1 class="hero-title">The Stackelberg Speaker: Optimizing Persuasive Communication in Social Deduction Games</h1>
         <p class="hero-authors">
@@ -40,8 +43,8 @@
 <!-- Abstract -->
 <section class="section" id="abstract">
     <div class="container">
-        <h2 class="section-title">Abstract</h2>
-        <div class="abstract-text">
+        <h2 class="section-title reveal">Abstract</h2>
+        <div class="abstract-text reveal">
             <p>
                 Large language model (LLM) agents have shown remarkable progress in social deduction games (SDGs). However, existing approaches primarily focus on information processing and strategy selection, overlooking the significance of <strong>persuasive communication</strong> in influencing other players' beliefs and responses. In SDGs, success depends not only on making correct deductions but also on convincing others to respond in alignment with one's intent.
             </p>
@@ -55,8 +58,8 @@
 <!-- Motivation -->
 <section class="section section-alt" id="motivation">
     <div class="container">
-        <h2 class="section-title">Motivation</h2>
-        <div class="motivation-layout">
+        <h2 class="section-title reveal">Motivation</h2>
+        <div class="motivation-layout reveal">
             <div class="motivation-img">
                 <img src="static/images/rl.png" alt="Methodological paradigms comparison">
             </div>
@@ -72,22 +75,22 @@
 <!-- Method -->
 <section class="section" id="method">
     <div class="container">
-        <h2 class="section-title">Method</h2>
+        <h2 class="section-title reveal">Method</h2>
 
-        <div class="method-intro">
+        <div class="method-intro reveal">
             <p>
                 We model the interaction between consecutive players as a two-player <strong>Stackelberg competition</strong>, where the current player acts as the leader, and the next player acts as the follower. If the leader sufficiently understands how the follower will respond, they can maximize their utility by selecting actions that optimize their expected outcomes.
             </p>
         </div>
 
-        <div class="figure-container">
+        <div class="figure-container reveal">
             <img src="static/images/concept.png" alt="Stackelberg optimization process" class="figure-img">
             <p class="figure-caption">
                 <strong>Stackelberg optimization process.</strong> First, the leader identifies its strategic intent by analyzing the current situation. Then, the leader measures the follower's response distribution to different leader actions. Finally, the leader optimizes its strategy to maximize its utility given the follower's response distribution.
             </p>
         </div>
 
-        <div class="figure-container" style="margin-top: 3rem;">
+        <div class="figure-container reveal" style="margin-top: 3rem;">
             <img src="static/images/framework.png" alt="Training framework" class="figure-img">
             <p class="figure-caption">
                 <strong>The training framework of our agent.</strong> Dark blue arrows indicate the inference pipeline, while light blue arrows represent additional processes during training. The backend LLM identifies desired and undesired target responses, then generates a base utterance. The Refiner enhances it for maximum persuasive impact. The Measurer computes rewards by measuring how different refined utterances affect the probabilities of generating desired and undesired responses.
@@ -95,17 +98,17 @@
         </div>
 
         <div class="method-steps">
-            <div class="step-card">
+            <div class="step-card reveal reveal-delay-1">
                 <div class="step-number">1</div>
                 <h3>Intent Identification</h3>
                 <p>The leader identifies its persuasive intent: a set of <em>desired</em> responses that would be advantageous if spoken by the follower, and a set of <em>undesired</em> responses that would be disadvantageous.</p>
             </div>
-            <div class="step-card">
+            <div class="step-card reveal reveal-delay-2">
                 <div class="step-number">2</div>
                 <h3>Impact Measurement</h3>
                 <p>The Measurer evaluates how different utterances shift the probability distribution of the follower's responses toward desired outcomes, computing a reward signal for training.</p>
             </div>
-            <div class="step-card">
+            <div class="step-card reveal reveal-delay-3">
                 <div class="step-number">3</div>
                 <h3>Strategy Optimization</h3>
                 <p>Using GRPO, the Refiner is trained to maximize persuasive impact by computing relative advantages within training batches, without requiring an explicit critic model.</p>
@@ -117,27 +120,27 @@
 <!-- Benchmarks -->
 <section class="section section-alt" id="benchmarks">
     <div class="container">
-        <h2 class="section-title">Supported Benchmarks</h2>
+        <h2 class="section-title reveal">Supported Benchmarks</h2>
         <div class="game-grid">
-            <div class="game-card">
+            <div class="game-card reveal reveal-delay-1">
                 <div class="game-icon">🐺</div>
                 <h3>Werewolf</h3>
                 <p>Classic social deduction with Werewolves, Seer, and Guardian. 7 players engage in night actions and day discussions.</p>
                 <span class="game-tag">7 Players</span>
             </div>
-            <div class="game-card">
+            <div class="game-card reveal reveal-delay-2">
                 <div class="game-icon">⚔️</div>
                 <h3>Avalon</h3>
                 <p>Team-based deduction with hidden roles including Merlin, Assassin, and Servants. Features quest missions and assassination.</p>
                 <span class="game-tag">5 Players</span>
             </div>
-            <div class="game-card">
+            <div class="game-card reveal reveal-delay-3">
                 <div class="game-icon">🌙</div>
                 <h3>ONUW</h3>
                 <p>One Night Ultimate Werewolf — a fast-paced single-night variant with role-swapping mechanics.</p>
                 <span class="game-tag">5 Players</span>
             </div>
-            <div class="game-card">
+            <div class="game-card reveal reveal-delay-4">
                 <div class="game-icon">🤝</div>
                 <h3>Sotopia</h3>
                 <p>Open-ended social simulation with diverse interpersonal scenarios requiring negotiation and cooperation.</p>
@@ -150,8 +153,8 @@
 <!-- Citation -->
 <section class="section" id="citation">
     <div class="container">
-        <h2 class="section-title">Citation</h2>
-        <div class="citation-block">
+        <h2 class="section-title reveal">Citation</h2>
+        <div class="citation-block reveal">
             <button class="copy-btn" onclick="copyBibtex()" title="Copy to clipboard">
                 <i class="fas fa-copy"></i>
             </button>
@@ -183,6 +186,17 @@ function copyBibtex() {
         setTimeout(() => { btn.innerHTML = '<i class="fas fa-copy"></i>'; }, 2000);
     });
 }
+
+// Scroll reveal animation
+const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+        if (entry.isIntersecting) {
+            entry.target.classList.add('visible');
+        }
+    });
+}, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
 </script>
 
 </body>
