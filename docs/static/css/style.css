@@ -80,11 +80,11 @@ body {
 }
 
 .hero-title {
-    font-size: 2.6rem;
+    font-size: 2.1rem;
     font-weight: 800;
-    line-height: 1.2;
+    line-height: 1.25;
     margin-bottom: 1.5rem;
-    max-width: 850px;
+    max-width: 800px;
     margin-left: auto;
     margin-right: auto;
     background: linear-gradient(135deg, #fff 0%, #c7d2fe 100%);
@@ -211,9 +211,15 @@ body {
 /* ---- Motivation Layout ---- */
 .motivation-layout {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: auto 1fr;
     gap: 3rem;
     align-items: center;
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.motivation-img {
+    max-width: 380px;
 }
 
 .motivation-img img {
@@ -518,11 +524,16 @@ body {
 /* ---- Responsive ---- */
 @media (max-width: 900px) {
     .hero-title {
-        font-size: 2rem;
+        font-size: 1.6rem;
     }
 
     .motivation-layout {
         grid-template-columns: 1fr;
+    }
+
+    .motivation-img {
+        max-width: 320px;
+        margin: 0 auto;
     }
 
     .method-steps {
@@ -544,7 +555,7 @@ body {
     }
 
     .hero-title {
-        font-size: 1.5rem;
+        font-size: 1.3rem;
     }
 
     .section {
