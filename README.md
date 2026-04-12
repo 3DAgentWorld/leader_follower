@@ -17,12 +17,6 @@ This is the official implementation of the ACL 2026 Main paper: *The Stackelberg
 | **ONUW** | One Night Ultimate Werewolf — fast-paced single-night variant | 5 | [onuw/README.md](onuw/README.md) |
 | **Sotopia** | Open-ended social simulation with diverse interpersonal scenarios | 2 | [sotopia/README.md](sotopia/README.md) |
 
-## TODO
-
-- ✅ Release code
-- ✅ Release data
-- [ ] Release checkpoints
-
 ## Citation
 
 If you find this work useful, please cite:
