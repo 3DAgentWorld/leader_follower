@@ -12,6 +12,23 @@
 </head>
 <body>
 
+<!-- Navigation Bar -->
+<nav class="navbar" id="navbar">
+    <div class="nav-container">
+        <a href="#" class="nav-logo">Stackelberg Speaker</a>
+        <div class="nav-links">
+            <a href="#abstract" class="nav-link">Abstract</a>
+            <a href="#motivation" class="nav-link">Motivation</a>
+            <a href="#method" class="nav-link">Method</a>
+            <a href="#benchmarks" class="nav-link">Benchmarks</a>
+            <a href="#citation" class="nav-link">BibTeX</a>
+        </div>
+    </div>
+</nav>
+
+<!-- Starry Sky Background Canvas -->
+<canvas id="starry-bg"></canvas>
+
 <!-- Hero Section -->
 <section class="hero">
     <div class="hero-bg"></div>
@@ -23,6 +40,7 @@
         <p class="hero-authors">
             Zhang Zheng &nbsp;·&nbsp; Deheng Ye &nbsp;·&nbsp; Peilin Zhao &nbsp;·&nbsp; Hao Wang
         </p>
+        <p class="hero-affiliation">The Hong Kong University of Science and Technology (Guangzhou)</p>
         <div class="hero-links">
             <a href="https://openreview.net/forum?id=mqzGJF0nc3" class="btn btn-primary" target="_blank">
                 <i class="fas fa-file-alt"></i> Paper
@@ -197,6 +215,138 @@ const observer = new IntersectionObserver((entries) => {
 }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
 
 document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+// Navbar scroll effect
+const navbar = document.getElementById('navbar');
+let lastScroll = 0;
+window.addEventListener('scroll', () => {
+    const currentScroll = window.pageYOffset;
+    if (currentScroll > 80) {
+        navbar.classList.add('nav-scrolled');
+    } else {
+        navbar.classList.remove('nav-scrolled');
+    }
+    lastScroll = currentScroll;
+});
+
+// Active nav link highlight
+const sections = document.querySelectorAll('.section');
+const navLinks = document.querySelectorAll('.nav-link');
+const navObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+        if (entry.isIntersecting) {
+            navLinks.forEach(link => link.classList.remove('active'));
+            const id = entry.target.getAttribute('id');
+            const activeLink = document.querySelector(`.nav-link[href="#${id}"]`);
+            if (activeLink) activeLink.classList.add('active');
+        }
+    });
+}, { threshold: 0.3, rootMargin: '-80px 0px -50% 0px' });
+
+sections.forEach(sec => navObserver.observe(sec));
+
+// Starry sky animation
+(function() {
+    const canvas = document.getElementById('starry-bg');
+    const ctx = canvas.getContext('2d');
+    let width, height, stars, shootingStars;
+
+    function resize() {
+        width = canvas.width = window.innerWidth;
+        height = canvas.height = window.innerHeight;
+    }
+
+    function createStars(count) {
+        stars = [];
+        for (let i = 0; i < count; i++) {
+            stars.push({
+                x: Math.random() * width,
+                y: Math.random() * height,
+                radius: Math.random() * 1.5 + 0.3,
+                opacity: Math.random() * 0.6 + 0.2,
+                twinkleSpeed: Math.random() * 0.02 + 0.005,
+                twinkleOffset: Math.random() * Math.PI * 2
+            });
+        }
+    }
+
+    function createShootingStars() {
+        shootingStars = [];
+    }
+
+    function maybeAddShootingStar() {
+        if (Math.random() < 0.002 && shootingStars.length < 2) {
+            shootingStars.push({
+                x: Math.random() * width * 0.8,
+                y: Math.random() * height * 0.4,
+                len: Math.random() * 60 + 40,
+                speed: Math.random() * 4 + 3,
+                opacity: 1,
+                angle: Math.PI / 4 + (Math.random() - 0.5) * 0.3
+            });
+        }
+    }
+
+    function draw(time) {
+        ctx.clearRect(0, 0, width, height);
+
+        // 绘制星星
+        stars.forEach(star => {
+            const twinkle = Math.sin(time * star.twinkleSpeed + star.twinkleOffset) * 0.3 + 0.7;
+            const alpha = star.opacity * twinkle;
+            ctx.beginPath();
+            ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(200, 210, 255, ${alpha})`;
+            ctx.fill();
+
+            // 给较大的星星加一点光晕
+            if (star.radius > 1.2) {
+                ctx.beginPath();
+                ctx.arc(star.x, star.y, star.radius * 3, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(180, 200, 255, ${alpha * 0.08})`;
+                ctx.fill();
+            }
+        });
+
+        // 绘制流星
+        maybeAddShootingStar();
+        shootingStars.forEach((s, i) => {
+            s.x += Math.cos(s.angle) * s.speed;
+            s.y += Math.sin(s.angle) * s.speed;
+            s.opacity -= 0.008;
+
+            if (s.opacity <= 0 || s.x > width || s.y > height) {
+                shootingStars.splice(i, 1);
+                return;
+            }
+
+            const tailX = s.x - Math.cos(s.angle) * s.len;
+            const tailY = s.y - Math.sin(s.angle) * s.len;
+            const gradient = ctx.createLinearGradient(tailX, tailY, s.x, s.y);
+            gradient.addColorStop(0, `rgba(200, 210, 255, 0)`);
+            gradient.addColorStop(1, `rgba(200, 210, 255, ${s.opacity * 0.6})`);
+
+            ctx.beginPath();
+            ctx.moveTo(tailX, tailY);
+            ctx.lineTo(s.x, s.y);
+            ctx.strokeStyle = gradient;
+            ctx.lineWidth = 1.2;
+            ctx.stroke();
+        });
+
+        requestAnimationFrame(draw);
+    }
+
+    window.addEventListener('resize', () => {
+        resize();
+        createStars(180);
+    });
+
+    resize();
+    createStars(180);
+    createShootingStars();
+    requestAnimationFrame(draw);
+})();
 </script>
 
 </body>

@@ -38,6 +38,88 @@ body {
     background: var(--bg);
     -webkit-font-smoothing: antialiased;
     overflow-x: hidden;
+    padding-top: 0;
+}
+
+/* ---- Starry Sky Canvas ---- */
+#starry-bg {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    background: linear-gradient(180deg, #0a0a1a 0%, #0d1127 40%, #111827 100%);
+    pointer-events: none;
+}
+
+/* ---- Navigation Bar ---- */
+.navbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    padding: 0.8rem 0;
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    background: transparent;
+}
+
+.navbar.nav-scrolled {
+    background: rgba(10, 10, 26, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(99, 102, 241, 0.1);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.15);
+    padding: 0.5rem 0;
+}
+
+.nav-container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.nav-logo {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.9);
+    text-decoration: none;
+    letter-spacing: -0.01em;
+    transition: color 0.3s ease;
+}
+
+.nav-logo:hover {
+    color: #c7d2fe;
+}
+
+.nav-links {
+    display: flex;
+    gap: 0.3rem;
+}
+
+.nav-link {
+    color: rgba(255, 255, 255, 0.6);
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 0.4rem 0.85rem;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.nav-link:hover {
+    color: rgba(255, 255, 255, 0.95);
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.nav-link.active {
+    color: #c7d2fe;
+    background: rgba(99, 102, 241, 0.15);
 }
 
 .container {
@@ -67,10 +149,10 @@ body {
 /* ---- Hero ---- */
 .hero {
     position: relative;
-    padding: 7rem 0 5rem;
+    padding: 9rem 0 5rem;
     text-align: center;
     overflow: hidden;
-    background: linear-gradient(135deg, #0c0a1a 0%, #1a1145 40%, #0f172a 70%, #0c1222 100%);
+    background: transparent;
     color: #fff;
 }
 
@@ -78,9 +160,9 @@ body {
     position: absolute;
     inset: 0;
     background:
-        radial-gradient(ellipse at 20% 40%, rgba(99, 102, 241, 0.2) 0%, transparent 50%),
-        radial-gradient(ellipse at 75% 60%, rgba(139, 92, 246, 0.18) 0%, transparent 45%),
-        radial-gradient(ellipse at 50% 80%, rgba(236, 72, 153, 0.08) 0%, transparent 40%);
+        radial-gradient(ellipse at 20% 40%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
+        radial-gradient(ellipse at 75% 60%, rgba(139, 92, 246, 0.12) 0%, transparent 45%),
+        radial-gradient(ellipse at 50% 80%, rgba(236, 72, 153, 0.06) 0%, transparent 40%);
     pointer-events: none;
 }
 
@@ -159,24 +241,35 @@ body {
     max-width: 800px;
     margin-left: auto;
     margin-right: auto;
-    background: linear-gradient(135deg, #ffffff 0%, #c7d2fe 50%, #a78bfa 100%);
+    background: linear-gradient(135deg, #e0e7ff 0%, #a5b4fc 25%, #c4b5fd 50%, #93c5fd 75%, #e0e7ff 100%);
+    background-size: 200% 200%;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
-    animation: titleGlow 3s ease-in-out infinite alternate;
+    animation: titleShimmer 6s ease-in-out infinite;
 }
 
-@keyframes titleGlow {
-    0% { filter: drop-shadow(0 0 0px transparent); }
-    100% { filter: drop-shadow(0 0 20px rgba(167, 139, 250, 0.3)); }
+@keyframes titleShimmer {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
 }
 
 .hero-authors {
     font-size: 1.05rem;
     color: #cbd5e1;
-    margin-bottom: 2.5rem;
+    margin-bottom: 0.6rem;
     font-weight: 400;
     letter-spacing: 0.02em;
+}
+
+.hero-affiliation {
+    font-size: 0.92rem;
+    color: rgba(167, 139, 250, 0.7);
+    margin-bottom: 2.5rem;
+    font-weight: 400;
+    font-style: italic;
+    letter-spacing: 0.01em;
 }
 
 .hero-links {
@@ -230,6 +323,7 @@ body {
 .section {
     padding: 5rem 0;
     position: relative;
+    background: var(--bg);
 }
 
 .section-alt {
@@ -628,12 +722,27 @@ body {
     font-size: 0.9rem;
     border-top: 1px solid var(--border);
     background: var(--bg-alt);
+    position: relative;
+    z-index: 1;
 }
 
 /* ---- Responsive ---- */
 @media (max-width: 900px) {
     .hero-title {
         font-size: 1.6rem;
+    }
+
+    .nav-logo {
+        display: none;
+    }
+
+    .nav-links {
+        gap: 0.1rem;
+    }
+
+    .nav-link {
+        font-size: 0.78rem;
+        padding: 0.35rem 0.6rem;
     }
 
     .motivation-layout {
@@ -660,7 +769,7 @@ body {
 
 @media (max-width: 600px) {
     .hero {
-        padding: 4rem 0 3rem;
+        padding: 7rem 0 3rem;
     }
 
     .hero-title {
